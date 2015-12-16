@@ -2,7 +2,7 @@ package sss.db
 
 import java.sql.DriverManager
 import java.sql.SQLException
-import sss.ancillary.Configure
+import _root_.sss.ancillary.Configure
 import sss.ancillary.Logging
 import javax.sql.DataSource
 import org.apache.commons.dbcp2.DriverManagerConnectionFactory
@@ -11,30 +11,50 @@ import org.apache.commons.pool2.impl.GenericObjectPool
 import org.apache.commons.dbcp2.PoolingDataSource
 import java.util.Properties
 import scala.collection.JavaConversions._
+import com.typesafe.config.Config
+import sss.ancillary.DynConfig
+import scala.language.dynamics
+import java.util.concurrent.ConcurrentHashMap
 
 object Db {
 
-  def apply(dbName: String) = {
-    new Db(dbName)
+  def apply(dbConfig: DbConfig) = {
+    new Db(dbConfig)
+  }
+
+  def apply(dbConfig: Config): Db = {
+    apply(DynConfig[DbConfig](dbConfig))
+  }
+
+  def apply(dbConfigName: String = "database"): Db = {
+    apply(DynConfig[DbConfig](dbConfigName))
   }
 }
 
-class Db(dbConfigName: String) extends Configure with Logging {
+trait DbConfig {
+  val driver: String
+  val connection: String
+  val user: String
+  val pass: String
+  val deleteSqlOpt: Option[java.lang.Iterable[String]]
+  val createSqlOpt: Option[java.lang.Iterable[String]]
+}
 
-  val myConfig = config(dbConfigName)
+class Db(dbConfig: DbConfig) extends Logging with Dynamic {
+
+  private val tables = new ConcurrentHashMap[String, Table]()
 
   // Load the HSQL Database Engine JDBC driver
   // hsqldb.jar should be in the class path or made part of the current jar
-  Class.forName(myConfig.getString("driver")) // "org.hsqldb.jdbc.JDBCDriver");
+  Class.forName(dbConfig.driver) // "org.hsqldb.jdbc.JDBCDriver");
 
-  private val ds = setUpDataSource(myConfig.getString("connection"),
-    myConfig.getString("user"),
-    myConfig.getString("pass"))
+  private val ds = setUpDataSource(dbConfig.connection,
+    dbConfig.user,
+    dbConfig.pass)
 
   {
 
-    if (myConfig.hasPath("deleteSql")) {
-      val deleteSqlAry = myConfig.getStringList("deleteSql")
+    dbConfig.deleteSqlOpt foreach { deleteSqlAry =>
 
       deleteSqlAry.foreach { deleteSql =>
         if (deleteSql.length > 0) {
@@ -56,8 +76,7 @@ class Db(dbConfigName: String) extends Configure with Logging {
       }
 
     }
-    if (myConfig.hasPath("createSql")) {
-      val createSqlAry = myConfig.getStringList("createSql")
+    dbConfig.createSqlOpt foreach { createSqlAry =>
       createSqlAry foreach { createSql =>
         if (createSql.length > 0) {
           val conn = ds.getConnection
@@ -78,8 +97,14 @@ class Db(dbConfigName: String) extends Configure with Logging {
 
   }
 
+  def selectDynamic(tableName: String) = table(tableName)
+
   def table(name: String): Table = {
-    new Table(name, ds);
+    tables.getOrElse(name, {
+      val t = new Table(name, ds)
+      tables.put(name, t)
+      t
+    })
   }
 
   def shutdown {

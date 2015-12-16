@@ -1,19 +1,13 @@
 
-scalaVersion := "2.11.4"
-
-//scalaVersion := "2.10.4"
+scalaVersion := "2.11.7"
 
 name := "sss-db"
 
-version := "0.9"
-
-scalacOptions ++= Seq("-deprecation", "-feature")
+version := "0.9.1"
 
 libraryDependencies += "org.hsqldb" % "hsqldb" % "2.3.2"
 
-libraryDependencies += "mcsherrylabs.com" %% "sss-ancillary" % "0.9"
-
-libraryDependencies += "org.scalatest" %% "scalatest" % "2.2.1" % "test"
+libraryDependencies += "mcsherrylabs.com" %% "sss-ancillary" % "0.9.3"
 
 libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.1.2"
 

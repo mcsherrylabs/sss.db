@@ -1,56 +1,33 @@
 package sss.db
 
 import java.sql.ResultSet
+import scala.annotation.tailrec
 
-class Row {
-  def apply[T](col: String): T = {
-    map(col.toUpperCase).asInstanceOf[T]
-  }
+object Rows {
+  def apply(rs: ResultSet): Rows = parse(rs)
 
-  var map: Map[String, Any] = Map()
+  def parse(rs: ResultSet): Rows = {
 
-  override def toString: String = {
-    map.foldLeft("") { case (a, (k, v)) => a + s" Key:${k}, Value: ${v}" }
-  }
-}
+    try {
 
-class Rows(private val rs: ResultSet) {
+      val meta = rs.getMetaData
+      val colmax = meta.getColumnCount
 
-  var rows: List[Row] = List()
-
-  dump(rs)
-
-  def size = rows.size
-
-  def dump(rs: ResultSet) {
-
-    // the order of the rows in a cursor
-    // are implementation dependent unless you use the SQL ORDER statement
-    val meta = rs.getMetaData();
-    val colmax = meta.getColumnCount();
-
-    // the result set is a cursor into the data.  You can only
-    // point to one row at a time
-    // assume we are pointing to BEFORE the first row
-    // rs.next() points to next row and returns true
-    // or false if there is no next row, which breaks the loop
-    while (rs.next()) {
-      var r = new Row()
-      for (i <- 0 until colmax) {
-        val o = rs.getObject(i + 1); // Is SQL the first column is indexed
-        r.map = r.map + (meta.getColumnName(i + 1).toUpperCase -> o)
-        // with 1 not 0
-        //System.out.print(o.toString() + " ");
+      @tailrec
+      def parse(rows: Rows, rs: ResultSet): Rows = {
+        if (rs.next) {
+          var r = Map[String, Any]()
+          for (i <- 0 until colmax) {
+            val o = rs.getObject(i + 1); // Is SQL the first column is indexed
+            r = r + (meta.getColumnName(i + 1).toUpperCase -> o)
+          }
+          parse((r: Row) +: rows, rs)
+        } else rows
       }
-      rows = r :: rows
-    }
+
+      parse(IndexedSeq[Row](), rs)
+    } finally rs.close
+
   }
 
-  def map[B](f: Row => B): List[B] = {
-    for {
-      row <- rows
-    } yield {
-      f(row)
-    }
-  }
 }

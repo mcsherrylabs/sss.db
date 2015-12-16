@@ -9,17 +9,21 @@ import scala.util.Success
 import scala.util.Failure
 import sss.ancillary.Logging
 import scala.util.control.NonFatal
+import java.sql.Statement
 
-trait Tx {
+private[db] trait Tx {
   def inTransaction[T](f: => T): T
   def startTx: Boolean
   def closeTx
 }
 
-case class ConnectionTracker(conn: Connection, count: Int)
+private[db] case class ConnectionTracker(conn: Connection, count: Int)
 
-object Tx extends ThreadLocal[ConnectionTracker]
+private[db] object Tx extends ThreadLocal[ConnectionTracker]
 
+/**
+ * SQL INJECTION ATTACKS .... CHANGE THE STATEMENTS
+ */
 class Table(val name: String, val ds: DataSource) extends Tx with Logging {
 
   implicit def conn: Connection = Tx.get.conn
@@ -74,19 +78,19 @@ class Table(val name: String, val ds: DataSource) extends Tx with Logging {
 
     rows.size match {
       case 0 => None
-      case 1 => Some(rows.rows(0))
+      case 1 => Some(rows(0))
       case size => throw new Error(s"Too many ${size}")
     }
   }
 
   private def getRowTx(id: Long): Option[Row] = getRowTx(s"id = ${id}")
 
-  private def mapTx[B](f: Row => B): List[B] = {
+  private def mapTx[B](f: Row => B): IndexedSeq[B] = {
 
     val st = conn.createStatement(); // statement objects can be reused with
     try {
       val rs = st.executeQuery(s"SELECT * FROM ${name}"); // run the query
-      new Rows(rs).map[B](f)
+      Rows(rs).map(f)
     } finally {
       st.close
     }
@@ -107,7 +111,7 @@ class Table(val name: String, val ds: DataSource) extends Tx with Logging {
     val st = conn.createStatement(); // statement objects can be reused with
     try {
       val rs = st.executeQuery(s"SELECT * FROM ${name} WHERE ${sql}"); // run the query
-      new Rows(rs)
+      Rows(rs)
     } finally {
       st.close
     }
@@ -155,7 +159,7 @@ class Table(val name: String, val ds: DataSource) extends Tx with Logging {
 
   def getRow(id: Long): Option[Row] = inTransaction[Option[Row]](getRowTx(id))
 
-  def map[B](f: Row => B): List[B] = inTransaction[List[B]](mapTx(f))
+  def map[B](f: Row => B): IndexedSeq[B] = inTransaction[IndexedSeq[B]](mapTx(f))
 
   def delete(sql: String): Int = inTransaction[Int](deleteTx(sql))
 
@@ -194,6 +198,42 @@ class Table(val name: String, val ds: DataSource) extends Tx with Logging {
 
   def insert(values: Any*): Int = {
     inTransaction(insertTx(values: _*))
+  }
+
+  def update(values: Map[String, Any]) = inTransaction {
+    val st = conn.createStatement(); // statement objects can be reused with
+    try {
+      val params = (values.foldLeft("") { (acc, e) => (s"${acc}, ${e._1}=${mapToSql(e._2)}") }).substring(1)
+
+      val sql = s"UPDATE ${name} SET ${params} WHERE id = ${mapToSql(values("id"))}"
+      val numRows = st.executeUpdate(sql); // run the query
+      numRows
+    } finally {
+      st.close
+    }
+  }
+
+  def insert(values: Map[String, Any]): Row = inTransaction {
+
+    val (names, params) = values.foldLeft(("", "")) { (acc, e) => (s"${acc._1}, ${e._1}", s"${acc._2}, ${mapToSql(e._2)}") }
+    val sql = s"INSERT INTO ${name} (${names.substring(1)}) VALUES ( ${params.substring(1)})"
+    val st = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)
+    try {
+      st.executeUpdate() // run the query
+      val ks = st.getGeneratedKeys
+      ks.next
+      getRow(ks.getInt(1)).getOrElse(DbError(s"Could not retrieve generated id of row just written to ${name}"))
+    } finally {
+      st.close
+    }
+
+  }
+
+  def persist(values: Map[String, Any]): Row = inTransaction {
+    values.get("id") match {
+      case None | Some(0) => insert(values)
+      case Some(existingId) => update(values); getRow(existingId.asInstanceOf[Int]).getOrElse(DbError(s"Could not retrieve row just written ${existingId}"))
+    }
   }
 
 }

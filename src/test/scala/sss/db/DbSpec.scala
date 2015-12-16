@@ -3,9 +3,9 @@ package sss.db
 import org.scalatest._
 import java.util.Date
 
-class DbSpec extends FlatSpec with Matchers {
+class DbSpec extends FlatSpec with Matchers with DbV2Spec {
 
-  "A Db " should " allow access to an existing table " in {
+  it should " allow access to an existing table " in {
 
     val dbUnderTest = Db("testDb")
     val table = dbUnderTest.table("test")
@@ -27,7 +27,7 @@ class DbSpec extends FlatSpec with Matchers {
     val table = dbUnderTest.table("test")
     val time = new Date()
     table.insert(0, "strId", time, 42)
-    val rows: List[Row] = table.map(r => r)
+    val rows = table.map(r => r)
     assert(rows.size === 1, "Should only be one row!")
     val row: Row = rows(0)
     println(row)
@@ -45,7 +45,7 @@ class DbSpec extends FlatSpec with Matchers {
     table.insert(0, "strId", time, 45)
     val rows = table.filter(s"createTime = ${time.getTime} ")
     assert(rows.size === 1, "Should only be one row found !")
-    val row = rows.rows(0)
+    val row = rows(0)
     assert(row[String]("strId") == "strId")
     assert(row[Long]("createTime") == time.getTime)
     assert(row[Int]("intVal") == 45)
@@ -60,7 +60,7 @@ class DbSpec extends FlatSpec with Matchers {
     val table = dbUnderTest.table("test")
     table.insert(99, "strId", time, 45)
     table.getRow(99) match {
-      case None => fail("oh oh, failed to find row by id")
+      case None    => fail("oh oh, failed to find row by id")
       case Some(r) => assert(r[Int]("id") == 99)
     }
 
@@ -74,7 +74,7 @@ class DbSpec extends FlatSpec with Matchers {
     val table = dbUnderTest.table("test")
     table.insert(99, "strId", time, 45)
     table.getRow(s"id = 99") match {
-      case None => fail("oh oh, failed to find row by id")
+      case None    => fail("oh oh, failed to find row by id")
       case Some(r) => assert(r[Int]("id") == 99)
     }
 
@@ -85,12 +85,13 @@ class DbSpec extends FlatSpec with Matchers {
 
     val time = new Date()
     val dbUnderTest = Db("testDb")
+
     val table = dbUnderTest.table("test")
     table.insert(99, "strId", time, 45)
-    table.insert(99, "strId", time, 45)
+    table.insert(100, "strId", time, 45)
     try {
-      table.getRow(s"id = 99")
-      fail("there are 2 rows with 99,  should throw ...")
+      table.getRow(s"strId = 'strId'")
+      fail("there are 2 rows with strId,  should throw ...")
     } catch {
       case e: Error =>
     }
@@ -118,7 +119,7 @@ class DbSpec extends FlatSpec with Matchers {
     try {
       table.getRow(s"id = 999999") match {
         case Some(r) => fail("there is a row with 999999,  should throw ...")
-        case x =>
+        case x       =>
       }
 
     } catch {
@@ -136,7 +137,7 @@ class DbSpec extends FlatSpec with Matchers {
     try {
       table.getRow(s"id = 999999") match {
         case Some(r) =>
-        case x => fail("there is no row with 999999...")
+        case x       => fail("there is no row with 999999...")
       }
 
     } catch {
