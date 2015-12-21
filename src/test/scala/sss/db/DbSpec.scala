@@ -4,7 +4,6 @@ import java.util.Date
 
 import org.scalatest._
 
-
 class DbSpec extends FlatSpec with Matchers with BeforeAndAfter with DbV2Spec {
 
   case class TestFixture(dbUnderTest: Db, table: Table)
@@ -42,7 +41,7 @@ class DbSpec extends FlatSpec with Matchers with BeforeAndAfter with DbV2Spec {
 
     val time = new Date()
     fixture.table.insert(0, "strId", time, 45)
-    val rows = fixture.table.filter(where("createTime = ?",time.getTime))
+    val rows = fixture.table.filter(where("createTime = ?", time.getTime))
     assert(rows.size === 1, "Should only be one row found !")
     val row = rows(0)
     assert(row("strId") === "strId")
@@ -99,7 +98,7 @@ class DbSpec extends FlatSpec with Matchers with BeforeAndAfter with DbV2Spec {
         case x =>
       }
 
-    } catch {case e: Error =>}
+    } catch { case e: Error => }
 
     try {
       fixture.table.inTransaction {

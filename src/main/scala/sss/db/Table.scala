@@ -1,6 +1,6 @@
 package sss.db
 
-import java.sql.{Connection, Statement}
+import java.sql.{ Connection, Statement }
 import javax.sql.DataSource
 
 import scala.util.control.NonFatal
@@ -144,7 +144,6 @@ class Table(name: String, ds: DataSource) extends View(name, ds) {
       st.close
     }
   }
-
 
   def insert(values: Any*): Int = tx {
 

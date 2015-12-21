@@ -1,6 +1,6 @@
 package sss.db
 
-import java.sql.{Connection, PreparedStatement}
+import java.sql.{ Connection, PreparedStatement }
 import java.util.Date
 import javax.sql.DataSource
 
@@ -26,13 +26,12 @@ class View(val name: String, val ds: DataSource) extends Tx with Logging {
       case v: Int => v
       case v: Long => v
       case v: Double => v
-      case v: scala.math.BigDecimal => v
+      case v: scala.math.BigDecimal => v.bigDecimal
+      case v: scala.math.BigInt => v.bigInteger
       case v: Float => v
       case v => DbError(s"Can't turn ${value} ${value.getClass} into sql value..")
     }
   }
-
-
 
   private[db] def prepareStatement(sql: String, params: Seq[Any], flags: Option[Int] = None): PreparedStatement = {
     val ps = flags match {

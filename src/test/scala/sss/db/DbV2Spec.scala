@@ -22,7 +22,7 @@ trait DbV2Spec {
     val r1 = fixture.table.persist(Map(("id" -> 0), ("strId" -> "strId"), ("createTime" -> time), ("intVal" -> 67)))
     assert(r1("id") !== 0)
     // save second Map
-    val r2  = fixture.table.persist(Map(("id" -> 0), ("strId" -> "strId"), ("createTime" -> time), ("intVal" -> 68)))
+    val r2 = fixture.table.persist(Map(("id" -> 0), ("strId" -> "strId"), ("createTime" -> time), ("intVal" -> 68)))
     assert(r2("intVal") === 68)
     assert(r2[Int]("intVal") !== r1[Int]("intVal"))
 
@@ -49,8 +49,8 @@ trait DbV2Spec {
   it should " count table rows " in {
 
     val time = new Date()
-    for(i <- 0 to 10) fixture.table.persist(Map(("strId" -> "strId"), ("createTime" -> time), ("intVal" -> 45)))
-    assert(11 ==  fixture.table.count)
+    for (i <- 0 to 10) fixture.table.persist(Map(("strId" -> "strId"), ("createTime" -> time), ("intVal" -> 45)))
+    assert(11 == fixture.table.count)
 
   }
 
@@ -68,18 +68,19 @@ trait DbV2Spec {
   it should " support paging in large tables " in {
 
     val time = new Date()
-    for(i <- 0 to 100) {
+    for (i <- 0 to 100) {
       fixture.table.persist(Map(("strId" -> "strId"), ("createTime" -> time), ("intVal" -> i)))
     }
 
-    for(i <- 0 to 10) {
-      val page = fixture.table.page(i * 10 , 10)
-      (i * 10 to (i * 10) + 10) zip page foreach { case(a, b) =>
-        assert(a == b[Int]("intVal"))
+    for (i <- 0 to 10) {
+      val page = fixture.table.page(i * 10, 10)
+      (i * 10 to (i * 10) + 10) zip page foreach {
+        case (a, b) =>
+          assert(a == b[Int]("intVal"))
       }
     }
 
-    val page = fixture.table.page(1000 , 1)
+    val page = fixture.table.page(1000, 1)
     assert(page.isEmpty)
   }
 
@@ -108,14 +109,14 @@ trait DbV2Spec {
 
     val table = fixture.dbUnderTest.testVersion
 
-      table.tx {
-        val m = table.persist(Map(("version" -> 0), ("strId" -> "Hello there world")))
-        val version = m[Long]("version")
-        assert(version == 0)
-        val m2 = table.persist(m)
-        val version2 =  m2[Long]("version")
-        assert(version2 == version + 1)
-      }
+    table.tx {
+      val m = table.persist(Map(("version" -> 0), ("strId" -> "Hello there world")))
+      val version = m[Long]("version")
+      assert(version == 0)
+      val m2 = table.persist(m)
+      val version2 = m2[Long]("version")
+      assert(version2 == version + 1)
+    }
   }
 
   it should " throw exception if optimistic locking clash happens " in {
@@ -133,8 +134,8 @@ trait DbV2Spec {
     }
 
     try {
-        table.persist(m)
-        fail("Should have got an optimistic locking ex")
+      table.persist(m)
+      fail("Should have got an optimistic locking ex")
     } catch {
       case e: DbOptimisticLockingException =>
       case NonFatal(x) => fail("Should have got an optimistic locking ex")

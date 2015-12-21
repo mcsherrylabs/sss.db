@@ -3,7 +3,7 @@ scalaVersion := "2.11.7"
 
 name := "sss-db"
 
-version := "0.9.3"
+version := "0.9.5"
 
 libraryDependencies += "org.hsqldb" % "hsqldb" % "2.3.2"
 
