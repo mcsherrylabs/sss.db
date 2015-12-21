@@ -1,20 +1,17 @@
 package sss.db
 
-import java.sql.DriverManager
 import java.sql.SQLException
-import _root_.sss.ancillary.Configure
-import sss.ancillary.Logging
-import javax.sql.DataSource
-import org.apache.commons.dbcp2.DriverManagerConnectionFactory
-import org.apache.commons.dbcp2.PoolableConnectionFactory
-import org.apache.commons.pool2.impl.GenericObjectPool
-import org.apache.commons.dbcp2.PoolingDataSource
 import java.util.Properties
-import scala.collection.JavaConversions._
-import com.typesafe.config.Config
-import sss.ancillary.DynConfig
-import scala.language.dynamics
 import java.util.concurrent.ConcurrentHashMap
+import javax.sql.DataSource
+
+import com.typesafe.config.Config
+import org.apache.commons.dbcp2.{DriverManagerConnectionFactory, PoolableConnectionFactory, PoolingDataSource}
+import org.apache.commons.pool2.impl.GenericObjectPool
+import sss.ancillary.{DynConfig, Logging}
+
+import scala.collection.JavaConversions._
+import scala.language.dynamics
 
 object Db {
 
@@ -65,7 +62,7 @@ class Db(dbConfig: DbConfig) extends Logging with Dynamic {
             log.info(s"${deleteSql} Deleted count ${deleted}")
           } catch {
             case e: SQLException => {
-              log.info(s"${deleteSql} failed, maybe object doesn't exist?!")
+              log.warn(s"${deleteSql} failed, maybe object doesn't exist?!", e)
             }
 
           } finally {
@@ -85,7 +82,7 @@ class Db(dbConfig: DbConfig) extends Logging with Dynamic {
             val created = st.executeUpdate(createSql)
             log.info(s"${createSql} Created count ${created}")
           } catch {
-            case e: SQLException => log.warn(s"Failed to create ${createSql}", e)
+            case e: SQLException => log.warn(s"Failed to create ${createSql}")
 
           } finally {
             st.close
@@ -107,18 +104,20 @@ class Db(dbConfig: DbConfig) extends Logging with Dynamic {
     })
   }
 
-  def shutdown {
-    val conn = ds.getConnection()
-    val st = conn.createStatement();
-    try {
-      // db writes out to files and performs clean shuts down
-      // otherwise there will be an unclean shutdown
-      // when program ends
-      st.execute("SHUTDOWN");
-    } finally {
-      conn.close();
-    }
+  def view(name: String): View = new View(name, ds)
 
+  def dropView(viewName: String) = executeSql(s"DROP VIEW ${viewName}")
+
+  def createView(createViewSql: String) = executeSql(createViewSql)
+
+  def shutdown = executeSql("SHUTDOWN")
+
+  private def executeSql(sql: String): Unit = {
+    val conn = ds.getConnection
+    val st = conn.createStatement()
+    try {
+      val created = st.executeUpdate(sql)
+    } finally st.close
   }
 
   private def setUpDataSource(connectURI: String, user: String, pass: String): DataSource = {

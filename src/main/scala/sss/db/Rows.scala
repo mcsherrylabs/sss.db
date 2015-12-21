@@ -1,6 +1,7 @@
 package sss.db
 
 import java.sql.ResultSet
+
 import scala.annotation.tailrec
 
 object Rows {
@@ -19,9 +20,9 @@ object Rows {
           var r = Map[String, Any]()
           for (i <- 0 until colmax) {
             val o = rs.getObject(i + 1); // Is SQL the first column is indexed
-            r = r + (meta.getColumnName(i + 1).toUpperCase -> o)
+            r = r + (meta.getColumnName(i + 1).toLowerCase -> o)
           }
-          parse((r: Row) +: rows, rs)
+          parse(rows :+ (r: Row), rs)
         } else rows
       }
 
