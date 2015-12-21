@@ -101,7 +101,7 @@ class View(val name: String, val ds: DataSource) extends Tx with Logging {
     try {
       val rs = st.executeQuery(s"SELECT COUNT(*) AS total FROM ${name}");
       if (rs.next) rs.getLong("total")
-      else (DbError("Database did not retun new primary key (table:$name)"))
+      else (DbError("Database did not return count for table: $name"))
     } finally {
       st.close
     }
