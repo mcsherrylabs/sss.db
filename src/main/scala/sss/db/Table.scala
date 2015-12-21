@@ -121,16 +121,17 @@ class Table(name: String, ds: DataSource) extends View(name, ds) {
     }
   }
 
-  def delete(sql: String): Int = tx[Int] {
+  def delete(where: Where): Int = tx[Int] {
 
-    val st = conn.createStatement(); // statement objects can be reused with
+    val ps = prepareStatement(s"DELETE FROM ${name} WHERE ${where.expand}", where.params)
     try {
-      st.executeUpdate(s"DELETE FROM ${name} WHERE ${sql}"); // run the query
+      ps.executeUpdate(); // run the query
     } finally {
-      st.close()
+      ps.close()
     }
   }
 
+  @deprecated("This does not use a prepared statement and is unsafe (SQL injection attack)", "0.9.2")
   def update(values: String, filter: String): Int = tx {
 
     val st = conn.createStatement(); // statement objects can be reused with
@@ -144,7 +145,7 @@ class Table(name: String, ds: DataSource) extends View(name, ds) {
     }
   }
 
-  @deprecated
+
   def insert(values: Any*): Int = tx {
 
     val params = (0 until values.size).map(x => "?").mkString(",")

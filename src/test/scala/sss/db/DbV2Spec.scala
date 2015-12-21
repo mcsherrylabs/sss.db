@@ -60,7 +60,7 @@ trait DbV2Spec {
     val r1 = fixture.table.persist(Map(("strId" -> "strId"), ("createTime" -> time), ("intVal" -> 45)))
     val r2 = fixture.table.find(Where("id = ?", r1("id")))
     assert(r1 == r2.get)
-    val deletedRowCount = fixture.table.delete(s"id = ${r1("id")}")
+    val deletedRowCount = fixture.table.delete(where("id = __all__", r1("id")))
     assert(deletedRowCount === 1)
     assert(fixture.table.find(where("id = ?", r1("id"))) == None)
   }

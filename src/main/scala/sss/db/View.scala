@@ -32,6 +32,8 @@ class View(val name: String, val ds: DataSource) extends Tx with Logging {
     }
   }
 
+
+
   private[db] def prepareStatement(sql: String, params: Seq[Any], flags: Option[Int] = None): PreparedStatement = {
     val ps = flags match {
       case None => conn.prepareStatement(s"${sql}")

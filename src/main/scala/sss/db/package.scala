@@ -26,6 +26,12 @@ package object db {
   implicit def toMap(r: Row): Map[String, _] = r.asMap
 
   sealed case class Where(clause: String, params: Any*) {
+    private[db] def expand : String = {
+      if(clause.contains("__all__")) {
+        val all = params.map {_ => "? "}.mkString(",")
+        clause.replace("__all__", all)
+      } else clause
+    }
     def apply(prms: Any*): Where = Where(clause = clause, params = prms: _*)
   }
 
