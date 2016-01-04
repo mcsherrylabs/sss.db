@@ -1,9 +1,9 @@
 
-scalaVersion := "2.11.7"
-
 name := "sss-db"
 
 version := "0.9.6"
+
+//scalaVersion := "2.15"
 
 resolvers += "stepsoft" at "http://nexus.mcsherrylabs.com/nexus/content/groups/public"
 
