@@ -5,6 +5,8 @@ name := "sss-db"
 
 version := "0.9.5"
 
+resolvers += "stepsoft" at "http://nexus.mcsherrylabs.com/nexus/content/groups/public"
+
 libraryDependencies += "org.hsqldb" % "hsqldb" % "2.3.2"
 
 libraryDependencies += "mcsherrylabs.com" %% "sss-ancillary" % "0.9.3"
