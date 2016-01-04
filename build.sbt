@@ -3,7 +3,7 @@ scalaVersion := "2.11.7"
 
 name := "sss-db"
 
-version := "0.9.5"
+version := "0.9.6"
 
 resolvers += "stepsoft" at "http://nexus.mcsherrylabs.com/nexus/content/groups/public"
 
@@ -13,7 +13,7 @@ libraryDependencies += "org.scalatest" %% "scalatest" % "2.2.4" % "test"
 
 libraryDependencies += "org.hsqldb" % "hsqldb" % "2.3.2"
 
-libraryDependencies += "mcsherrylabs.com" %% "sss-ancillary" % "0.9.3"
+libraryDependencies += "mcsherrylabs.com" %% "sss-ancillary" % "0.9.4"
 
 libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.1.2"
 
