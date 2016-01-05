@@ -16,7 +16,7 @@ trait DbV2Spec {
     assert(r2("intVal") === 68)
   }
 
-  it should " deal with '0' in map " in {
+  it should " deal with '0' id in map " in {
 
     val time = new Date()
     val r1 = fixture.table.persist(Map(("id" -> 0), ("strId" -> "strId"), ("createTime" -> time), ("intVal" -> 67)))
