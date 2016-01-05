@@ -34,9 +34,8 @@ database {
 	
 }
 ```
-(Remove the delete and/or create sql if you don't want them to run)
+(Remove the delete and/or create sql if you don't want them to run. If the table definition contains a 'version' column, optimistic locking is supported automagically)
 
-If the table definition contains a 'version' column, optimistic locking is supported automagically.
 Create an instance of a Db (picks up 'database' config by default) and work with a table...
 
 ```
