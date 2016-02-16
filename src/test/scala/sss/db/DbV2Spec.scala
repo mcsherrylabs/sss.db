@@ -124,7 +124,7 @@ trait DbV2Spec {
     val table = fixture.dbUnderTest.testVersion
 
     val m = table.tx {
-      val m = table.persist(Map(("version" -> 0), ("strId" -> "Hello there world")))
+      val m = table.persist(Map("version" -> 0, "strId" -> "Hello there world"))
       val version = m[Long]("version")
       assert(version == 0)
       //save row
@@ -142,13 +142,13 @@ trait DbV2Spec {
     }
   }
 
-  /*it should " support persisting case classes " in {
+  it should " support persisting binary arrays as a blob " in {
 
-    case class TestDb(strId: String, id: Long = 0, version: Long = 0)
     val testStr = "Hello My Friend"
-    val table = fixture.dbUnderTest.testVersion
-    val m = table.persist(TestDb(testStr))
-    assert(m[String]("strId") == testStr)
-    assert(m[Long]("id") != 0)
-  }*/
+    val table = fixture.dbUnderTest.testBinary
+    val m = table.persist(Map("blobVal" -> testStr.getBytes))
+    assert(m[Array[Byte]]("blobVal") === testStr.getBytes)
+    assert(new String(m[Array[Byte]]("blobVal")) === testStr)
+
+  }
 }

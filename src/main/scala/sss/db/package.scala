@@ -1,5 +1,9 @@
 package sss
 
+import java.io.InputStream
+
+import org.hsqldb.jdbc.JDBCBlobClient
+
 import scala.language.implicitConversions
 /**
  * @author alan
@@ -21,7 +25,7 @@ package object db {
 
   type Rows = IndexedSeq[Row]
 
-  type ColumnTypes = String with Long with Short with Integer with Int with Float with Boolean with BigDecimal with Byte with Double with Array[_] with java.sql.Date with java.sql.Time with java.sql.Timestamp with java.sql.Clob with java.sql.Blob with java.sql.Array with java.sql.Ref with java.sql.Struct
+  type ColumnTypes = String with Long with Short with Integer with Int with Float with Boolean with BigDecimal with Byte with Double with Array[Byte] with java.sql.Date with java.sql.Time with java.sql.Timestamp with java.sql.Clob with java.sql.Blob with java.sql.Array with java.sql.Ref with java.sql.Struct
 
   implicit def toMap(r: Row): Map[String, _] = r.asMap
 
@@ -41,9 +45,6 @@ package object db {
   def where(sql: String): WhereBuilder = new WhereBuilder(sql)
   def where(sql: String, params: Any*): Where = Where(sql, params: _*)
 
-  //def where(sql: String): Where = Where(sql)
-
-  //import scala.language.dynamics
   import scala.reflect.runtime.universe._
 
   implicit class Row(val asMap: Map[String, _]) {
@@ -57,7 +58,18 @@ package object db {
 
     def get(col: String) = asMap(col.toLowerCase)
 
-    def apply[T >: ColumnTypes: TypeTag](col: String): T = asMap(col.toLowerCase).asInstanceOf[T]
+    def apply[T >: ColumnTypes: TypeTag](col: String): T = {
+
+      val rawVal = asMap(col.toLowerCase)
+      val massaged = if(typeOf[T] == typeOf[Array[Byte]]) blobToBytes(rawVal.asInstanceOf[JDBCBlobClient])
+      else if (typeOf[T] == typeOf[InputStream]) blobToStream(rawVal.asInstanceOf[JDBCBlobClient])
+      else rawVal
+
+      massaged.asInstanceOf[T]
+    }
+
+    private def blobToStream(jDBCBlobClient: JDBCBlobClient): InputStream = jDBCBlobClient.getBinaryStream
+    private def blobToBytes(jDBCBlobClient: JDBCBlobClient): Array[Byte]= jDBCBlobClient.getBytes(1, jDBCBlobClient.length.toInt)
 
     override def toString: String = {
       asMap.foldLeft("") { case (a, (k, v)) => a + s" Key:${k}, Value: ${v}" }

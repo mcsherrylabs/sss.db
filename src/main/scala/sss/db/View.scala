@@ -1,6 +1,6 @@
 package sss.db
 
-import java.sql.{ Connection, PreparedStatement }
+import java.sql.{Connection, PreparedStatement}
 import java.util.Date
 import javax.sql.DataSource
 
@@ -26,6 +26,7 @@ class View(val name: String, val ds: DataSource) extends Tx with Logging {
       case v: Int => v
       case v: Long => v
       case v: Double => v
+      case v: Array[Byte] => v
       case v: scala.math.BigDecimal => v.bigDecimal
       case v: scala.math.BigInt => v.bigInteger
       case v: Float => v
