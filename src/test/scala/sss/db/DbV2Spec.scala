@@ -151,4 +151,17 @@ trait DbV2Spec {
     assert(new String(m[Array[Byte]]("blobVal")) === testStr)
 
   }
+
+  it should " support find along binary arrays " in {
+
+    val testStr = "Hello My Friend"
+    val table = fixture.dbUnderTest.testBinary
+    val bytes = testStr.getBytes
+    table.persist(Map("blobVal" -> bytes))
+
+    val found = table.find(Where("blobVal = ?", bytes))
+    assert( found.isDefined)
+    assert(found.get[Array[Byte]]("blobVal") === bytes)
+
+  }
 }
