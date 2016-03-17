@@ -112,11 +112,13 @@ class Db(dbConfig: DbConfig) extends Logging with Dynamic {
 
   def shutdown = executeSql("SHUTDOWN")
 
-  private def executeSql(sql: String): Unit = {
+  def executeSqls(sqls: Seq[String]): Seq[Int] = sqls.map(executeSql(_))
+
+  def executeSql(sql: String):Int = {
     val conn = ds.getConnection
     val st = conn.createStatement()
     try {
-      val created = st.executeUpdate(sql)
+      st.executeUpdate(sql)
     } finally st.close
   }
 

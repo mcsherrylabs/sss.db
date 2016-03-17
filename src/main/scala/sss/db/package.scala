@@ -1,6 +1,7 @@
 package sss
 
 import java.io.InputStream
+import java.math.BigDecimal
 
 import org.hsqldb.jdbc.JDBCBlobClient
 
