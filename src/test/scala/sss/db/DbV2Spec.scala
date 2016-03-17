@@ -2,6 +2,7 @@ package sss.db
 
 import java.util.Date
 
+import scala.collection.mutable
 import scala.util.control.NonFatal
 
 trait DbV2Spec {
@@ -152,6 +153,16 @@ trait DbV2Spec {
 
   }
 
+  it should " support persisting wrapped binary arrays as a blob " in {
+
+    val testStr = "Hello My Friend"
+    val table = fixture.dbUnderTest.testBinary
+    val wAry : mutable.WrappedArray[Byte] = testStr.getBytes
+    val m = table.persist(Map("blobVal" -> wAry))
+    assert(m[mutable.WrappedArray[Byte]]("blobVal") === wAry)
+    assert(new String(m[mutable.WrappedArray[Byte]]("blobVal").array) === testStr)
+
+  }
   it should " support find along binary arrays " in {
 
     val testStr = "Hello My Friend"
@@ -162,6 +173,19 @@ trait DbV2Spec {
     val found = table.find(Where("blobVal = ?", bytes))
     assert( found.isDefined)
     assert(found.get[Array[Byte]]("blobVal") === bytes)
+
+  }
+
+  it should " NOT support find along wrapped binary arrays (use .array)" in {
+
+    val testStr = "Hello My Friend"
+    val table = fixture.dbUnderTest.testBinary
+    val wAry : mutable.WrappedArray[Byte] = testStr.getBytes
+    val m = table.persist(Map("blobVal" -> wAry))
+
+    val found = table.find(Where("blobVal = ?", wAry.array))
+    assert( found.isDefined)
+    assert(found.get[mutable.WrappedArray[Byte]]("blobVal") === wAry)
 
   }
 }

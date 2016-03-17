@@ -7,6 +7,8 @@ import javax.sql.DataSource
 import org.joda.time.LocalDate
 import sss.ancillary.Logging
 
+import scala.collection.mutable
+
 class View(val name: String, val ds: DataSource) extends Tx with Logging {
 
   protected val id = "id"
@@ -27,6 +29,7 @@ class View(val name: String, val ds: DataSource) extends Tx with Logging {
       case v: Long => v
       case v: Double => v
       case v: Array[Byte] => v
+      case v: mutable.WrappedArray[_] => v.array
       case v: scala.math.BigDecimal => v.bigDecimal
       case v: scala.math.BigInt => v.bigInteger
       case v: Float => v

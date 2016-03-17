@@ -5,6 +5,7 @@ import java.math.BigDecimal
 
 import org.hsqldb.jdbc.JDBCBlobClient
 
+import scala.collection.mutable
 import scala.language.implicitConversions
 /**
  * @author alan
@@ -26,7 +27,7 @@ package object db {
 
   type Rows = IndexedSeq[Row]
 
-  type ColumnTypes = String with Long with Short with Integer with Int with Float with Boolean with BigDecimal with Byte with Double with Array[Byte] with java.sql.Date with java.sql.Time with java.sql.Timestamp with java.sql.Clob with java.sql.Blob with java.sql.Array with java.sql.Ref with java.sql.Struct
+  type ColumnTypes = String with Long with Short with Integer with Int with Float with Boolean with BigDecimal with Byte with Double with scala.collection.mutable.WrappedArray[Byte] with Array[Byte] with java.sql.Date with java.sql.Time with java.sql.Timestamp with java.sql.Clob with java.sql.Blob with java.sql.Array with java.sql.Ref with java.sql.Struct
 
   implicit def toMap(r: Row): Map[String, _] = r.asMap
 
@@ -63,6 +64,7 @@ package object db {
 
       val rawVal = asMap(col.toLowerCase)
       val massaged = if(typeOf[T] == typeOf[Array[Byte]]) blobToBytes(rawVal.asInstanceOf[JDBCBlobClient])
+      else if (typeOf[T] == typeOf[mutable.WrappedArray[Byte]]) blobToWrappedBytes(rawVal.asInstanceOf[JDBCBlobClient])
       else if (typeOf[T] == typeOf[InputStream]) blobToStream(rawVal.asInstanceOf[JDBCBlobClient])
       else rawVal
 
@@ -71,6 +73,7 @@ package object db {
 
     private def blobToStream(jDBCBlobClient: JDBCBlobClient): InputStream = jDBCBlobClient.getBinaryStream
     private def blobToBytes(jDBCBlobClient: JDBCBlobClient): Array[Byte]= jDBCBlobClient.getBytes(1, jDBCBlobClient.length.toInt)
+    private def blobToWrappedBytes(jDBCBlobClient: JDBCBlobClient): mutable.WrappedArray[Byte]= jDBCBlobClient.getBytes(1, jDBCBlobClient.length.toInt)
 
     override def toString: String = {
       asMap.foldLeft("") { case (a, (k, v)) => a + s" Key:${k}, Value: ${v}" }
