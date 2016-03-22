@@ -6,9 +6,9 @@ import java.util.concurrent.ConcurrentHashMap
 import javax.sql.DataSource
 
 import com.typesafe.config.Config
-import org.apache.commons.dbcp2.{ DriverManagerConnectionFactory, PoolableConnectionFactory, PoolingDataSource }
+import org.apache.commons.dbcp2.{DriverManagerConnectionFactory, PoolableConnectionFactory, PoolingDataSource}
 import org.apache.commons.pool2.impl.GenericObjectPool
-import sss.ancillary.{ DynConfig, Logging }
+import sss.ancillary.{DynConfig, Logging}
 
 import scala.collection.JavaConversions._
 import scala.language.dynamics
@@ -40,6 +40,8 @@ trait DbConfig {
 class Db(dbConfig: DbConfig) extends Logging with Dynamic {
 
   private val tables = new ConcurrentHashMap[String, Table]()
+
+  sys addShutdownHook shutdown
 
   // Load the HSQL Database Engine JDBC driver
   // hsqldb.jar should be in the class path or made part of the current jar
