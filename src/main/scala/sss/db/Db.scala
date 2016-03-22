@@ -33,6 +33,7 @@ trait DbConfig {
   val connection: String
   val user: String
   val pass: String
+  val useShutdownHook: Boolean
   val deleteSqlOpt: Option[java.lang.Iterable[String]]
   val createSqlOpt: Option[java.lang.Iterable[String]]
 }
@@ -41,7 +42,7 @@ class Db(dbConfig: DbConfig) extends Logging with Dynamic {
 
   private val tables = new ConcurrentHashMap[String, Table]()
 
-  sys addShutdownHook shutdown
+  if(dbConfig.useShutdownHook) sys addShutdownHook shutdown
 
   // Load the HSQL Database Engine JDBC driver
   // hsqldb.jar should be in the class path or made part of the current jar
@@ -99,11 +100,13 @@ class Db(dbConfig: DbConfig) extends Logging with Dynamic {
   def selectDynamic(tableName: String) = table(tableName)
 
   def table(name: String): Table = {
-    tables.getOrElse(name, {
-      val t = new Table(name, ds)
-      tables.put(name, t)
-      t
-    })
+    Option(tables.get(name)) match {
+      case None => {
+        tables.putIfAbsent(name, new Table(name, ds))
+        tables.get(name)
+      }
+      case Some(t) => t
+    }
   }
 
   def view(name: String): View = new View(name, ds)
