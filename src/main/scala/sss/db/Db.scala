@@ -9,6 +9,7 @@ import sss.ancillary.{DynConfig, Logging}
 
 import scala.collection.JavaConversions._
 import scala.language.dynamics
+import scala.util.control.NonFatal
 
 object Db {
 
@@ -129,7 +130,14 @@ class Db(dbConfig: DbConfig) extends Logging with Dynamic {
     val st = conn.createStatement()
     try {
       st.executeUpdate(sql)
-    } finally st.close
+    } finally {
+      try {
+        st.close
+        conn.commit
+      } catch {
+        case NonFatal(e) => log.error(s"$sql FAILED -> ", e)
+      } finally conn.close
+    }
   }
 
   private def setUpDataSource(dbConfig: DbConfig) = {

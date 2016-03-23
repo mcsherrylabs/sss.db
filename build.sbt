@@ -1,7 +1,7 @@
 
 name := "sss-db"
 
-version := "0.9.12"
+version := "0.9.13"
 
 
 resolvers += "stepsoft" at "http://nexus.mcsherrylabs.com/nexus/content/groups/public"
