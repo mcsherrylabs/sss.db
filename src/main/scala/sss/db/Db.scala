@@ -1,13 +1,10 @@
 package sss.db
 
 import java.sql.SQLException
-import java.util.Properties
 import java.util.concurrent.ConcurrentHashMap
-import javax.sql.DataSource
 
 import com.typesafe.config.Config
-import org.apache.commons.dbcp2.{DriverManagerConnectionFactory, PoolableConnectionFactory, PoolingDataSource}
-import org.apache.commons.pool2.impl.GenericObjectPool
+import com.zaxxer.hikari.{HikariConfig, HikariDataSource}
 import sss.ancillary.{DynConfig, Logging}
 
 import scala.collection.JavaConversions._
@@ -29,6 +26,12 @@ object Db {
 }
 
 trait DbConfig {
+  val testQueryOpt: Option[String]
+  val maxPoolSize: Int
+  val cachePrepStmts : Boolean
+  val prepStmtCacheSize: Int
+  val prepStmtCacheSqlLimit: Int
+  val useServerPrepStmts: Boolean
   val driver: String
   val connection: String
   val user: String
@@ -36,6 +39,7 @@ trait DbConfig {
   val useShutdownHook: Boolean
   val deleteSqlOpt: Option[java.lang.Iterable[String]]
   val createSqlOpt: Option[java.lang.Iterable[String]]
+
 }
 
 class Db(dbConfig: DbConfig) extends Logging with Dynamic {
@@ -46,11 +50,9 @@ class Db(dbConfig: DbConfig) extends Logging with Dynamic {
 
   // Load the HSQL Database Engine JDBC driver
   // hsqldb.jar should be in the class path or made part of the current jar
-  Class.forName(dbConfig.driver) // "org.hsqldb.jdbc.JDBCDriver");
+  //Class.forName(dbConfig.driver) // "org.hsqldb.jdbc.JDBCDriver");
 
-  private val ds = setUpDataSource(dbConfig.connection,
-    dbConfig.user,
-    dbConfig.pass)
+  private val ds = setUpDataSource(dbConfig)
 
   {
 
@@ -115,7 +117,10 @@ class Db(dbConfig: DbConfig) extends Logging with Dynamic {
 
   def createView(createViewSql: String) = executeSql(createViewSql)
 
-  def shutdown = executeSql("SHUTDOWN")
+  def shutdown = {
+    executeSql("SHUTDOWN")
+    ds.close
+  }
 
   def executeSqls(sqls: Seq[String]): Seq[Int] = sqls.map(executeSql(_))
 
@@ -127,44 +132,26 @@ class Db(dbConfig: DbConfig) extends Logging with Dynamic {
     } finally st.close
   }
 
-  private def setUpDataSource(connectURI: String, user: String, pass: String): DataSource = {
-    //
-    // First, we'll create a ConnectionFactory that the
-    // pool will use to create Connections.
-    // We'll use the DriverManagerConnectionFactory,
-    // using the connect string passed in the command line
-    // arguments.
-    //
-    val props = new Properties()
-    props.setProperty("user", user)
-    props.setProperty("password", pass)
-    val connectionFactory = new DriverManagerConnectionFactory(connectURI, props)
+  private def setUpDataSource(dbConfig: DbConfig) = {
 
-    //
-    // Next we'll create the PoolableConnectionFactory, which wraps
-    // the "real" Connections created by the ConnectionFactory with
-    // the classes that implement the pooling functionality.
-    //
-    val poolableConnectionFactory = new PoolableConnectionFactory(connectionFactory, null);
-    poolableConnectionFactory.setDefaultAutoCommit(false);
+    val hikariConfig = new HikariConfig()
+    hikariConfig.setDriverClassName(dbConfig.driver)
+    hikariConfig.setJdbcUrl(dbConfig.connection)
+    hikariConfig.setUsername(dbConfig.user)
+    hikariConfig.setPassword(dbConfig.pass)
+    hikariConfig.setAutoCommit(false)
 
-    //
-    // Now we'll need a ObjectPool that serves as the
-    // actual pool of connections.
-    //
-    // We'll use a GenericObjectPool instance, although
-    // any ObjectPool implementation will suffice.
-    //
-    val connectionPool = new GenericObjectPool(poolableConnectionFactory)
+    hikariConfig.setMaximumPoolSize(dbConfig.maxPoolSize)
+    dbConfig.testQueryOpt map (hikariConfig.setConnectionTestQuery(_))
+    hikariConfig.setPoolName("hikariCP")
 
-    // Set the factory's pool property to the owning pool
-    poolableConnectionFactory.setPool(connectionPool);
 
-    //
-    // Finally, we create the PoolingDriver itself,
-    // passing in the object pool we created.
-    //
-    new PoolingDataSource(connectionPool)
+    hikariConfig.addDataSourceProperty("dataSource.cachePrepStmts", dbConfig.cachePrepStmts)
+    hikariConfig.addDataSourceProperty("dataSource.prepStmtCacheSize", dbConfig.prepStmtCacheSize)
+    hikariConfig.addDataSourceProperty("dataSource.prepStmtCacheSqlLimit", dbConfig.prepStmtCacheSqlLimit)
+    hikariConfig.addDataSourceProperty("dataSource.useServerPrepStmts", dbConfig.useServerPrepStmts)
+
+    new HikariDataSource(hikariConfig)
 
   }
 }
