@@ -9,13 +9,13 @@ import sss.ancillary.Logging
 
 import scala.collection.mutable
 
-class View(val name: String, val ds: DataSource) extends Tx with Logging {
+class View(val name: String, private[db] val ds: DataSource) extends Tx with Logging {
 
   protected val id = "id"
   protected val version = "version"
 
   private val selectSql = s"SELECT * from ${name}"
-  private[db] implicit def conn: Connection = Tx.get.conn
+  private[db] def conn: Connection = Tx.get.conn
 
   private[db] def mapToSql(value: Any): Any = {
     value match {

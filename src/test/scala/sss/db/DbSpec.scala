@@ -7,6 +7,7 @@ import org.scalatest._
 class DbSpec extends FlatSpec with Matchers with BeforeAndAfter with DbV2Spec {
 
   case class TestFixture(dbUnderTest: Db, table: Table)
+
   var fixture: TestFixture = _
 
   before {
@@ -90,7 +91,9 @@ class DbSpec extends FlatSpec with Matchers with BeforeAndAfter with DbV2Spec {
         throw new Error("Ah HA!")
 
       }
-    } catch { case e: Error => println(e) }
+    } catch {
+      case e: Error => println(e)
+    }
 
     try {
       fixture.table.find(where("id = ?", 999999)) match {
@@ -98,13 +101,17 @@ class DbSpec extends FlatSpec with Matchers with BeforeAndAfter with DbV2Spec {
         case x =>
       }
 
-    } catch { case e: Error => }
+    } catch {
+      case e: Error =>
+    }
 
     try {
       fixture.table.inTransaction {
         fixture.table.insert(999999, "strId", time, 45)
       }
-    } catch { case e: Error => println(e) }
+    } catch {
+      case e: Error => println(e)
+    }
 
     try {
       fixture.table.find(where("id = ?", 999999)) match {
@@ -112,6 +119,94 @@ class DbSpec extends FlatSpec with Matchers with BeforeAndAfter with DbV2Spec {
         case x => fail("there is no row with 999999...")
       }
 
-    } catch { case e: Error => }
+    } catch {
+      case e: Error =>
+    }
   }
+
+  it should " support a transaction from db level " in {
+    val time = new Date()
+    try {
+      fixture.dbUnderTest.inTransaction {
+        fixture.table.insert(999999, "strId", time, 45)
+        throw new Error("Ah HA!")
+
+      }
+    } catch {
+      case e: Error => println(e)
+    }
+
+    try {
+      fixture.table.find(where("id = ?", 999999)) match {
+        case Some(r) => fail("there is a row with 999999,  should have thrown ex ...")
+        case x =>
+      }
+
+    } catch {
+      case e: Error =>
+    }
+
+    try {
+      fixture.dbUnderTest.inTransaction {
+        fixture.table.insert(999999, "strId", time, 45)
+      }
+    } catch {
+      case e: Error => println(e)
+    }
+
+    try {
+      fixture.table.find(where("id = ?", 999999)) match {
+        case Some(r) =>
+        case x => fail("there is no row with 999999...")
+      }
+
+    } catch {
+      case e: Error =>
+    }
+  }
+
+  it should " honour executeSql fail from db level transaction " in {
+    val time = new Date()
+    try {
+      fixture.dbUnderTest.inTransaction {
+        val n = fixture.table.name
+        fixture.dbUnderTest.executeSql(s"INSERT INTO $n VALUES (999999, 'strId', ${time.getTime}, 45)")
+        throw new Error("Ah HA!")
+
+      }
+    } catch {
+      case e: Error => println(e)
+    }
+
+    try {
+      fixture.table.find(where("id = ?", 999999)) match {
+        case Some(r) => fail("there is a row with 999999,  should have thrown ex ...")
+        case x =>
+      }
+
+    } catch {
+      case e: Error =>
+    }
+  }
+  it should " honour executeSql from db level transaction " in {
+    val time = new Date()
+    val n = fixture.table.name
+
+    fixture.dbUnderTest.inTransaction {
+      fixture.dbUnderTest.executeSql(s"INSERT INTO $n VALUES (999999, 'strId', ${time.getTime}, 45)")
+    }
+
+    fixture.table.find(where("id = ?", 999999)) match {
+      case Some(r) =>
+      case None => fail("there is no row with 999999.")
+    }
+
+    fixture.dbUnderTest.executeSql(s"INSERT INTO $n VALUES (199999, 'strId', ${time.getTime}, 45)")
+    fixture.table.find(where("id = ?", 199999)) match {
+      case Some(r) =>
+      case None => fail("there is no row with 199999.")
+    }
+
+  }
+
 }

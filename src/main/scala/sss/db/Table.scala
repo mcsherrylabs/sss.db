@@ -1,13 +1,16 @@
 package sss.db
 
-import java.sql.{ Connection, Statement }
+import java.sql.{Connection, Statement}
 import javax.sql.DataSource
+
+import sss.ancillary.Logging
 
 import scala.util.control.NonFatal
 
-trait Tx {
+trait Tx extends Logging {
 
-  self: View =>
+  private[db] val ds: DataSource
+  private[db] def conn: Connection
 
   def startTx: Boolean = {
     Option(Tx.get()) match {

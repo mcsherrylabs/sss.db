@@ -1,6 +1,6 @@
 package sss.db
 
-import java.sql.SQLException
+import java.sql.{Connection, SQLException}
 import java.util.concurrent.ConcurrentHashMap
 
 import com.typesafe.config.Config
@@ -9,7 +9,6 @@ import sss.ancillary.{DynConfig, Logging}
 
 import scala.collection.JavaConversions._
 import scala.language.dynamics
-import scala.util.control.NonFatal
 
 object Db {
 
@@ -43,9 +42,11 @@ trait DbConfig {
 
 }
 
-class Db(dbConfig: DbConfig) extends Logging with Dynamic {
+class Db(dbConfig: DbConfig) extends Logging with Dynamic with Tx {
 
   private val tables = new ConcurrentHashMap[String, Table]()
+
+  override private[db] def conn: Connection = Tx.get.conn
 
   if(dbConfig.useShutdownHook) sys addShutdownHook shutdown
 
@@ -53,7 +54,7 @@ class Db(dbConfig: DbConfig) extends Logging with Dynamic {
   // hsqldb.jar should be in the class path or made part of the current jar
   //Class.forName(dbConfig.driver) // "org.hsqldb.jdbc.JDBCDriver");
 
-  private val ds = setUpDataSource(dbConfig)
+  private[db] val ds = setUpDataSource(dbConfig)
 
   {
 
@@ -61,19 +62,11 @@ class Db(dbConfig: DbConfig) extends Logging with Dynamic {
 
       deleteSqlAry.foreach { deleteSql =>
         if (deleteSql.length > 0) {
-          val conn = ds.getConnection
-          val st = conn.createStatement()
           try {
-            val deleted = st.executeUpdate(deleteSql)
+            val deleted = executeSql(deleteSql)
             log.info(s"${deleteSql} Deleted count ${deleted}")
           } catch {
-            case e: SQLException => {
-              log.warn(s"${deleteSql} failed, maybe object doesn't exist?!", e)
-            }
-
-          } finally {
-            st.close
-            conn.close
+            case e: SQLException => log.warn(s"${deleteSql} failed, maybe object doesn't exist?!", e)
           }
         }
       }
@@ -82,17 +75,11 @@ class Db(dbConfig: DbConfig) extends Logging with Dynamic {
     dbConfig.createSqlOpt foreach { createSqlAry =>
       createSqlAry foreach { createSql =>
         if (createSql.length > 0) {
-          val conn = ds.getConnection
-          val st = conn.createStatement()
           try {
-            val created = st.executeUpdate(createSql)
+            val created = executeSql(createSql)
             log.info(s"${createSql} Created count ${created}")
           } catch {
             case e: SQLException => log.warn(s"Failed to create ${createSql}")
-
-          } finally {
-            st.close
-            conn.close
           }
         }
       }
@@ -125,19 +112,11 @@ class Db(dbConfig: DbConfig) extends Logging with Dynamic {
 
   def executeSqls(sqls: Seq[String]): Seq[Int] = sqls.map(executeSql(_))
 
-  def executeSql(sql: String):Int = {
-    val conn = ds.getConnection
+  def executeSql(sql: String):Int = inTransaction {
     val st = conn.createStatement()
     try {
       st.executeUpdate(sql)
-    } finally {
-      try {
-        st.close
-        conn.commit
-      } catch {
-        case NonFatal(e) => log.error(s"$sql FAILED -> ", e)
-      } finally conn.close
-    }
+    } finally st.close
   }
 
   private def setUpDataSource(dbConfig: DbConfig) = {
@@ -162,4 +141,6 @@ class Db(dbConfig: DbConfig) extends Logging with Dynamic {
     new HikariDataSource(hikariConfig)
 
   }
+
+
 }
