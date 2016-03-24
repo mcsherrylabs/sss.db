@@ -38,6 +38,26 @@ class DbSpec extends FlatSpec with Matchers with BeforeAndAfter with DbV2Spec {
     assert(row("intVal") === 42)
   }
 
+  it should " be able to read all rows from a table (in order!) " in {
+
+    val time = new Date()
+    (0 to 10).map (fixture.table.insert(0, "strId", time, _))
+    var intVal = 10
+    fixture.table.map (r => {
+
+      assert(intVal == r[Int]("intVal"))
+      intVal -= 1
+    }, OrderDesc("intVal"))
+
+    intVal = 0
+    fixture.table.map (r => {
+
+      assert(intVal == r[Int]("intVal"))
+      intVal += 1
+    }, OrderAsc("intVal"))
+
+  }
+
   it should " be able to find the row inserted " in {
 
     val time = new Date()

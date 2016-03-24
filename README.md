@@ -10,14 +10,14 @@ Supports
  - transactions 
  - optimistic versioning
  - connection pool
- - insert, update, delete, find, filter, count, page...
+ - insert, update, delete, find, filter, count, page, map, order ...
  - uses prepared statements to aid SQL injection prevention
 
 In build.sbt add ...
 ```
 resolvers += "stepsoft" at "http://nexus.mcsherrylabs.com/nexus/content/groups/public"
  
-libraryDependencies += "mcsherrylabs.com" %% "sss-db" % "0.9.14"
+libraryDependencies += "mcsherrylabs.com" %% "sss-db" % "0.9.15"
 ``` 
 
 Define a database in application.conf

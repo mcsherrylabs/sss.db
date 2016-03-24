@@ -31,6 +31,10 @@ package object db {
 
   implicit def toMap(r: Row): Map[String, _] = r.asMap
 
+  trait OrderBy
+  sealed case class OrderDesc(colName: String) extends OrderBy
+  sealed case class OrderAsc(colName: String)extends OrderBy
+
   sealed case class Where(clause: String, params: Any*) {
     private[db] def expand: String = {
       if (clause.contains("__all__")) {

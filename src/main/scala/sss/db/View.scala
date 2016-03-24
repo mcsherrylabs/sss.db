@@ -40,11 +40,9 @@ class View(val name: String, private[db] val ds: DataSource) extends Tx with Log
   private[db] def prepareStatement(sql: String, params: Seq[Any], flags: Option[Int] = None): PreparedStatement = {
     val ps = flags match {
       case None => conn.prepareStatement(s"${sql}")
-      case Some(flags) => conn.prepareStatement(s"${sql}", flags)
+      case Some(flgs) => conn.prepareStatement(s"${sql}", flgs)
     }
-    for (i <- 0 until params.length) {
-      ps.setObject(i + 1, mapToSql(params(i)))
-    }
+    for (i <- params.indices) ps.setObject(i + 1, mapToSql(params(i)))
     ps
   }
 
@@ -60,14 +58,21 @@ class View(val name: String, private[db] val ds: DataSource) extends Tx with Log
 
   def getRow(id: Long): Option[Row] = getRow(Where("id = ?", id))
 
-  def map[B](f: Row => B): IndexedSeq[B] = tx {
+  def map[B](f: Row => B, orderClauses: OrderBy*): IndexedSeq[B] = tx {
 
     val st = conn.createStatement(); // statement objects can be reused with
     try {
-      val rs = st.executeQuery(selectSql) // run the query
+      val clause = if(orderClauses.nonEmpty)
+        " ORDER BY " + orderClauses.map {
+          case OrderDesc(col) => s"$col DESC"
+          case OrderAsc(col) => s"$col ASC"
+        }.mkString(",")
+        else ""
+
+      val rs = st.executeQuery(selectSql + clause) // run the query
       Rows(rs).map(f)
     } finally {
-      st.close
+      st.close()
     }
   }
 
@@ -75,9 +80,8 @@ class View(val name: String, private[db] val ds: DataSource) extends Tx with Log
 
     val ps = conn.prepareStatement(s"${selectSql} WHERE ${where.clause}"); // run the query
     try {
-      for (i <- 0 until where.params.length) {
-        ps.setObject(i + 1, where.params(i))
-      }
+
+      for(i <- where.params.indices) ps.setObject(i + 1, where.params(i))
       val rs = ps.executeQuery
       Rows(rs)
     } finally {
@@ -87,14 +91,14 @@ class View(val name: String, private[db] val ds: DataSource) extends Tx with Log
 
   def find(sql: Where): Option[Row] = inTransaction[Option[Row]](getRow(sql))
 
-  def apply(id: Long): Row = (getRow(id).getOrElse(DbException(s"No row with id ${id}")))
+  def apply(id: Long): Row = getRow(id).getOrElse(DbException(s"No row with id ${id}"))
 
   def get(id: Long): Option[Row] = tx[Option[Row]](getRow(id))
 
   def page(start: Int, pageSize: Int): Rows = tx {
     val st = conn.createStatement(); // statement objects can be reused with
     try {
-      val rs = st.executeQuery(s"${selectSql} LIMIT ${start}, ${pageSize}");
+      val rs = st.executeQuery(s"${selectSql} LIMIT ${start}, ${pageSize}")
       Rows(rs)
     } finally {
       st.close
@@ -104,9 +108,9 @@ class View(val name: String, private[db] val ds: DataSource) extends Tx with Log
   def count: Long = tx {
     val st = conn.createStatement(); // statement objects can be reused with
     try {
-      val rs = st.executeQuery(s"SELECT COUNT(*) AS total FROM ${name}");
+      val rs = st.executeQuery(s"SELECT COUNT(*) AS total FROM ${name}")
       if (rs.next) rs.getLong("total")
-      else (DbError("Database did not return count for table: $name"))
+      else DbError("Database did not return count for table: $name")
     } finally {
       st.close
     }
