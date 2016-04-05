@@ -12,11 +12,6 @@ import scala.language.implicitConversions
  */
 package object db {
 
-  /*implicit def flattenToMap(cc: AnyRef): Map[String, Any] =
-    (Map[String, Any]() /: cc.getClass.getDeclaredFields) { (a, f) =>
-      f.setAccessible(true)
-      a + (f.getName -> f.get(cc))
-    }*/
 
   object DbException { def apply(msg: String) = throw new DbException(msg) }
   object DbError { def apply(msg: String) = throw new DbError(msg) }
@@ -33,7 +28,7 @@ package object db {
 
   trait OrderBy
   sealed case class OrderDesc(colName: String) extends OrderBy
-  sealed case class OrderAsc(colName: String)extends OrderBy
+  sealed case class OrderAsc(colName: String) extends OrderBy
 
   sealed case class Where(clause: String, params: Any*) {
     private[db] def expand: String = {

@@ -85,6 +85,24 @@ trait DbV2Spec {
     assert(page.isEmpty)
   }
 
+  it should " support ordered paging in large tables " in {
+
+    val time = new Date()
+    for (i <- 0 to 100) {
+      fixture.table.persist(Map(("strId" -> "strId"), ("createTime" -> time), ("intVal" -> i)))
+    }
+
+    for (i <- 10 to 0) {
+      val page = fixture.table.page(i * 10, 10, Seq(OrderDesc("intVal")))
+      (i * 10 to (i * 10) + 10) zip page foreach {
+        case (a, b) =>
+          assert(a == b[Int]("intVal"))
+      }
+    }
+
+    val page = fixture.table.page(1000, 1)
+    assert(page.isEmpty)
+  }
   it should " support views  " in {
 
     val time = new Date()

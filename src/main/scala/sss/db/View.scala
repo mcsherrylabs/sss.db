@@ -46,6 +46,15 @@ class View(val name: String, private[db] val ds: DataSource) extends Tx with Log
     ps
   }
 
+  private def orderByClausesToString(orderClauses: Seq[OrderBy]): String = {
+    if(orderClauses.nonEmpty)
+      " ORDER BY " + orderClauses.map {
+        case OrderDesc(col) => s"$col DESC"
+        case OrderAsc(col) => s"$col ASC"
+      }.mkString(",")
+    else ""
+  }
+
   def getRow(sql: Where): Option[Row] = tx {
     val rows = filter(sql)
 
@@ -62,13 +71,7 @@ class View(val name: String, private[db] val ds: DataSource) extends Tx with Log
 
     val st = conn.createStatement(); // statement objects can be reused with
     try {
-      val clause = if(orderClauses.nonEmpty)
-        " ORDER BY " + orderClauses.map {
-          case OrderDesc(col) => s"$col DESC"
-          case OrderAsc(col) => s"$col ASC"
-        }.mkString(",")
-        else ""
-
+      val clause = orderByClausesToString(orderClauses)
       val rs = st.executeQuery(selectSql + clause) // run the query
       Rows(rs).map(f)
     } finally {
@@ -95,10 +98,11 @@ class View(val name: String, private[db] val ds: DataSource) extends Tx with Log
 
   def get(id: Long): Option[Row] = tx[Option[Row]](getRow(id))
 
-  def page(start: Int, pageSize: Int): Rows = tx {
+  def page(start: Int, pageSize: Int, orderClauses: Seq[OrderBy] = Seq(OrderAsc("id"))): Rows = tx {
     val st = conn.createStatement(); // statement objects can be reused with
     try {
-      val rs = st.executeQuery(s"${selectSql} LIMIT ${start}, ${pageSize}")
+      val orderClausesStr = orderByClausesToString(orderClauses)
+      val rs = st.executeQuery(s"${selectSql} $orderClausesStr LIMIT ${start}, ${pageSize}")
       Rows(rs)
     } finally {
       st.close
