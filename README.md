@@ -17,7 +17,7 @@ In build.sbt add ...
 ```
 resolvers += "stepsoft" at "http://nexus.mcsherrylabs.com/nexus/content/groups/public"
  
-libraryDependencies += "mcsherrylabs.com" %% "sss-db" % "0.9.16"
+libraryDependencies += "mcsherrylabs.com" %% "sss-db" % "0.9.17"
 ``` 
 
 Define a database in application.conf
