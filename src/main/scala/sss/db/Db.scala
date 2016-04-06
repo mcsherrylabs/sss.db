@@ -110,8 +110,22 @@ class Db(dbConfig: DbConfig) extends Logging with Dynamic with Tx {
     ds.close
   }
 
-  def executeSqls(sqls: Seq[String]): Seq[Int] = sqls.map(executeSql(_))
+  /**
+    * Execute a sequence of sql statements each in a single transaction.
+    *
+    * @param sqls
+    * @return
+    * @note This is a gateway for sql injection attacks, use with extreme caution.
+    */
+  def executeSqls(sqls: Seq[String]): Seq[Int] = inTransaction(sqls.map(executeSql(_)))
 
+  /**
+    * Execute any sql you give it on a db connection in a transaction
+    * .
+    * @param sql - sql to execute
+    * @return
+    * @note This is a gateway for sql injection attacks, use with extreme caution.
+    */
   def executeSql(sql: String):Int = inTransaction {
     val st = conn.createStatement()
     try {

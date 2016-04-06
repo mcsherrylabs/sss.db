@@ -134,7 +134,15 @@ class Table(name: String, ds: DataSource) extends View(name, ds) {
     }
   }
 
-  @deprecated("This does not use a prepared statement and is unsafe (SQL injection attack)", "0.9.2")
+  /**
+    * Update the table using a filter
+    *
+    * @param values the values to update
+    * @param filter the 'where' clause (minus the where)
+    * @return usually the number of rows updated.
+    * @note This is a gateway for sql injection attacks, Use update(Map[]) if possible.
+    * @example update("count = count + 1", "id = 1")
+    */
   def update(values: String, filter: String): Int = tx {
 
     val st = conn.createStatement(); // statement objects can be reused with
