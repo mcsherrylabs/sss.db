@@ -1,13 +1,14 @@
 package sss.db
 
 import java.sql.{Connection, SQLException}
-import java.util.concurrent.ConcurrentHashMap
 
+import com.twitter.util.SynchronizedLruMap
 import com.typesafe.config.Config
 import com.zaxxer.hikari.{HikariConfig, HikariDataSource}
 import sss.ancillary.{DynConfig, Logging}
 
 import scala.collection.JavaConversions._
+import scala.collection.mutable.{Map => MMap}
 import scala.language.dynamics
 
 object Db {
@@ -37,6 +38,7 @@ trait DbConfig {
   val user: String
   val pass: String
   val useShutdownHook: Boolean
+  val tableCacheSize: Int
   val deleteSqlOpt: Option[java.lang.Iterable[String]]
   val createSqlOpt: Option[java.lang.Iterable[String]]
 
@@ -44,15 +46,12 @@ trait DbConfig {
 
 class Db(dbConfig: DbConfig) extends Logging with Dynamic with Tx {
 
-  private val tables = new ConcurrentHashMap[String, Table]()
+  private lazy val tables: MMap[String, Table] = new SynchronizedLruMap[String, Table](dbConfig.tableCacheSize)
+
 
   override private[db] def conn: Connection = Tx.get.conn
 
   if(dbConfig.useShutdownHook) sys addShutdownHook shutdown
-
-  // Load the HSQL Database Engine JDBC driver
-  // hsqldb.jar should be in the class path or made part of the current jar
-  //Class.forName(dbConfig.driver) // "org.hsqldb.jdbc.JDBCDriver");
 
   private[db] val ds = setUpDataSource(dbConfig)
 
@@ -89,15 +88,7 @@ class Db(dbConfig: DbConfig) extends Logging with Dynamic with Tx {
 
   def selectDynamic(tableName: String) = table(tableName)
 
-  def table(name: String): Table = {
-    Option(tables.get(name)) match {
-      case None => {
-        tables.putIfAbsent(name, new Table(name, ds))
-        tables.get(name)
-      }
-      case Some(t) => t
-    }
-  }
+  def table(name: String): Table =  tables.getOrElseUpdate(name, new Table(name, ds))
 
   def view(name: String): View = new View(name, ds)
 

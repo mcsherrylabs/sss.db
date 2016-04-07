@@ -98,7 +98,7 @@ class View(val name: String, private[db] val ds: DataSource) extends Tx with Log
 
   def get(id: Long): Option[Row] = tx[Option[Row]](getRow(id))
 
-  def page(start: Int, pageSize: Int, orderClauses: Seq[OrderBy] = Seq(OrderAsc("id"))): Rows = tx {
+  def page(start: Long, pageSize: Int, orderClauses: Seq[OrderBy] = Seq(OrderAsc("id"))): Rows = tx {
     val st = conn.createStatement(); // statement objects can be reused with
     try {
       val orderClausesStr = orderByClausesToString(orderClauses)

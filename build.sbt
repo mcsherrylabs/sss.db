@@ -1,7 +1,7 @@
 
 name := "sss-db"
 
-version := "0.9.17"
+version := "0.9.18"
 
 
 resolvers += "stepsoft" at "http://nexus.mcsherrylabs.com/nexus/content/groups/public"
@@ -21,3 +21,5 @@ libraryDependencies += "org.apache.commons" % "commons-dbcp2" % "2.0"
 libraryDependencies += "org.apache.commons" % "commons-pool2" % "2.0"
 
 libraryDependencies += "com.zaxxer" % "HikariCP" % "2.4.5"
+
+libraryDependencies += "com.twitter" %% "util-collection" % "6.27.0"
