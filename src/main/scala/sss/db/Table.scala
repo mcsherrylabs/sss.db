@@ -97,7 +97,10 @@ class Table(name: String, ds: DataSource) extends View(name, ds) {
   }
 
   /**
-    * If a non zero id is provided
+    * If an id is provided it will overwrite the generated identity
+    * Either remove the id for genuine inserts or use 'persist' for
+    * the best of both worlds.
+    *
     * @param values
     * @return
     */
