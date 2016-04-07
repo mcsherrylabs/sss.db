@@ -17,6 +17,15 @@ trait DbV2Spec {
     assert(r2("intVal") === 68)
   }
 
+  it should " allow a specific value even in an identity field " in {
+
+    val time = new Date()
+    val r1 = fixture.table.insert(Map(("id" -> 1000), ("strId" -> "strId"), ("createTime" -> time), ("intVal" -> 67)))
+    assert(r1("id") === 1000)
+    val r2 = fixture.table.get(1000).get
+    assert(r2 === r1)
+
+  }
   it should " deal with '0' id in map " in {
 
     val time = new Date()

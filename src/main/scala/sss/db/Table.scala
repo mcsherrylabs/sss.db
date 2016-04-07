@@ -96,15 +96,18 @@ class Table(name: String, ds: DataSource) extends View(name, ds) {
     }
   }
 
+  /**
+    * If a non zero id is provided
+    * @param values
+    * @return
+    */
   def insert(values: Map[String, Any]): Row = inTransaction {
 
-    val minusId = values.filterNot { case (n: String, v) => id.equalsIgnoreCase(n) }
-
-    val names = minusId.keys.mkString(",")
-    val params = (0 until minusId.keys.size).map(x => "?").mkString(",")
+    val names = values.keys.mkString(",")
+    val params = (0 until values.keys.size).map(x => "?").mkString(",")
 
     val sql = s"INSERT INTO ${name} (${names}) VALUES ( ${params})"
-    val ps = prepareStatement(sql, minusId.values.toSeq, Some(Statement.RETURN_GENERATED_KEYS))
+    val ps = prepareStatement(sql, values.values.toSeq, Some(Statement.RETURN_GENERATED_KEYS))
     try {
       ps.executeUpdate() // run the query
       val ks = ps.getGeneratedKeys
@@ -116,11 +119,32 @@ class Table(name: String, ds: DataSource) extends View(name, ds) {
 
   }
 
+  /**
+    * Use persist to either update or insert.
+    *
+    * If id exists in the Map and is not 0 then it's considered an update
+    * If id doesn't exist in the map or in the special case where it's 0 to
+    * facilitate case classes with an id default value of 0 - it's considered an insert.
+    *
+    * @example
+    *          case class MyRecord(name : String, id: Int = 0)
+    *          val row = table.persist(MyRecord("Tony"))
+    *          val tony = MyRecord(row)
+    *          assert(tony.name == "Tony")
+    *          assert(tony.id != 0)
+    *          val updatedRow = table.persist(tony.copy(name = "Karl")
+    *          val karl = MyRecord(updatedRow)
+    *          assert(tony.id == karl.id)
+    *
+    * @param values
+    * @return
+    */
   def persist(values: Map[String, Any]): Row = inTransaction {
 
-    values.get(id) match {
-      case None | Some(0l) => insert(values)
-      case Some(existingId) => update(values)
+    values.span(kv => id.equalsIgnoreCase(kv._1)) match {
+      case (mapWithId, rest) if(mapWithId.isEmpty)=> insert(rest)
+      case (mapWithId, rest) if(mapWithId.head._2 == 0l) => insert(rest)
+      case _ =>  update(values)
     }
   }
 
