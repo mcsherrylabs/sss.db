@@ -215,4 +215,18 @@ trait DbV2Spec {
     assert(found.get[mutable.WrappedArray[Byte]]("blobVal") === wAry)
 
   }
+
+  it should " support use of boolean fields " in {
+
+    val table = fixture.dbUnderTest.testBool
+    val f = table.persist(Map("boolVal" -> false))
+    val m = table.persist(Map("boolVal" -> true))
+    val r = table.get(m("id"))
+    assert(r.isDefined)
+    assert(r.get("boolVal") === true)
+    assert(r.get[Boolean]("boolVal") === true)
+    val found = table.find(Where("boolVal = ?", true))
+    assert( found.isDefined)
+
+  }
 }

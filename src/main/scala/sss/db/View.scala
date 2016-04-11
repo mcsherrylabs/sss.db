@@ -25,6 +25,7 @@ class View(val name: String, private[db] val ds: DataSource) extends Tx with Log
       case null => null
       case Some(x) => mapToSql(x)
       case None => null
+      case v: Boolean => v
       case v: Int => v
       case v: Long => v
       case v: Double => v
