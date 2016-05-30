@@ -47,6 +47,18 @@ trait DbV2Spec {
 
   }
 
+  it should " allow persist(update) using a map with id " in {
+
+    val time = new Date()
+    val r1 = fixture.table.persist(Map("strId" -> "strId", "createTime" -> time, "intVal" -> 45))
+    val id = r1[Long]("id")
+    val r2 = fixture.table.persist(Map("strId" -> "strId", "createTime" -> time, "intVal" -> 90, "id" -> id))
+    assert(r2[Int]("intVal") == 90)
+    val r3 = fixture.table(id)
+    assert(r3[Int]("intVal") == 90)
+
+  }
+
   it should " allow dynamic table access " in {
 
     val time = new Date()

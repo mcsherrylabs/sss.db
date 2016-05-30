@@ -144,8 +144,8 @@ class Table(name: String, ds: DataSource) extends View(name, ds) {
     */
   def persist(values: Map[String, Any]): Row = inTransaction {
 
-    values.span(kv => id.equalsIgnoreCase(kv._1)) match {
-      case (mapWithId, rest) if(mapWithId.isEmpty)=> insert(rest)
+    values.partition(kv => id.equalsIgnoreCase(kv._1)) match {
+      case (mapWithId, rest) if(mapWithId.isEmpty) => insert(rest)
       case (mapWithId, rest) if(mapWithId.head._2 == 0l) => insert(rest)
       case _ =>  update(values)
     }
