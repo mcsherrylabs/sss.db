@@ -133,12 +133,12 @@ trait DbV2Spec {
 
         fixture.dbUnderTest.createView("CREATE VIEW testview2 AS SELECT strId, intVal FROM test WHERE intVal > 50")
         for (i <- 0 to 100) {
-          fixture.table.persist(Map(("strId" -> "strId"), ("createTime" -> time), ("intVal" -> i)))
+          fixture.table.persist(Map("strId" -> "strId", "createTime" -> time, "intVal" -> i))
         }
         val view = fixture.dbUnderTest.view("testview2")
         assert(view.count == 50)
-        val empty = view.filter(where("intVal < 50"))
-        assert(empty.size == 0)
+        val empty = view.filter(Where("intVal < 50"))
+        assert(empty.isEmpty)
       }
     } finally fixture.dbUnderTest.dropView("testview2")
   }
@@ -239,6 +239,37 @@ trait DbV2Spec {
     assert(r.get[Boolean]("boolVal") === true)
     val found = table.find(Where("boolVal = ?", true))
     assert( found.isDefined)
+
+  }
+
+  it should " get the id of a row given criteria " in {
+
+    val table = fixture.dbUnderTest.test
+    val r = table.insert(Map("strId" -> "hellothere"))
+    val theId = table.toLongId("strId" -> "hellothere")
+    assert( theId === r[Long]("id"))
+  }
+
+  it should " get the ids of many rows given criteria " in {
+
+    val table = fixture.dbUnderTest.test
+    val rowsIds = ((0 to 10) map {_ => table.insert(Map("strId" -> "manyhellos"))}).map(_[Long]("id"))
+    val theIds = table.toLongIds("strId" -> "manyhellos")
+    assert(theIds.size === rowsIds.size)
+    assert(theIds.filterNot(rowsIds.contains(_)).isEmpty)
+
+  }
+
+  it should " get the Int ids of many rows given criteria " in {
+
+    val table = fixture.dbUnderTest.testIntId
+    val rowsIds = ((0 to 10) map {_ => table.insert(Map("strVal" -> "manyhellos"))}).map(_[Int]("id"))
+    val theIds = table.toIntIds("strVal" -> "manyhellos")
+
+    assert(table.toIntIdOpt("strVal" -> "not there").isEmpty)
+
+    assert(theIds.size === rowsIds.size)
+    assert(theIds.filterNot(rowsIds.contains(_)).isEmpty)
 
   }
 }

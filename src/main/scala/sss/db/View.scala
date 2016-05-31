@@ -8,6 +8,8 @@ import org.joda.time.LocalDate
 import sss.ancillary.Logging
 
 import scala.collection.mutable
+import scala.reflect.runtime.universe._
+
 
 class View(val name: String, private[db] val ds: DataSource) extends Tx with Logging {
 
@@ -47,6 +49,13 @@ class View(val name: String, private[db] val ds: DataSource) extends Tx with Log
     ps
   }
 
+  private def tuplesToWhere(lookup:(String, Any)*): Where = {
+    val asMap = lookup.toMap
+    val sqls = asMap.keys.map {k => s"$k = ?"}
+    val sql = sqls.mkString(" AND ")
+    Where(sql, asMap.values.toSeq :_*)
+  }
+
   private def orderByClausesToString(orderClauses: Seq[OrderBy]): String = {
     if(orderClauses.nonEmpty)
       " ORDER BY " + orderClauses.map {
@@ -80,12 +89,16 @@ class View(val name: String, private[db] val ds: DataSource) extends Tx with Log
     }
   }
 
+  /**
+    * Note - You can put ORDER BY into the Where clause ...
+    *
+    * @param where
+    * @return
+    */
   def filter(where: Where): Rows = tx {
 
-    val ps = conn.prepareStatement(s"${selectSql} WHERE ${where.clause}"); // run the query
+    val ps = prepareStatement(s"${selectSql} WHERE ${where.clause}", where.params) // run the query
     try {
-
-      for(i <- where.params.indices) ps.setObject(i + 1, where.params(i))
       val rs = ps.executeQuery
       Rows(rs)
     } finally {
@@ -93,11 +106,39 @@ class View(val name: String, private[db] val ds: DataSource) extends Tx with Log
     }
   }
 
-  def find(sql: Where): Option[Row] = inTransaction[Option[Row]](getRow(sql))
+  def filter(lookup: (String, Any)*): Seq[Row] = filter(tuplesToWhere(lookup: _*))
+
+  def find(lookup: (String, Any)*): Option[Row] = find(tuplesToWhere(lookup: _*))
+
+  def find(sql: Where): Option[Row] = getRow(sql)
 
   def apply(id: Long): Row = getRow(id).getOrElse(DbException(s"No row with id ${id}"))
 
-  def get(id: Long): Option[Row] = tx[Option[Row]](getRow(id))
+  /**
+    * Shorthand way of getting the id from a row
+    * Often the id is used as a fk but the lookup
+    * key is a string, use this to get the id from
+    * the lookup string.
+    *
+    * @param lookup (e.g. ("name" -> "John")
+    * @tparam T
+    * @return
+    */
+
+  def toIdOpt[T >: Long with Int: TypeTag](lookup: (String, Any)*): Option[T] = find(lookup: _*) map(_[T](id))
+
+  def toId[T >: Long with Int: TypeTag](lookup: (String, Any)*): T = toIdOpt[T](lookup: _*).get
+  def toIds[T >: Long with Int: TypeTag](lookup: (String, Any)*): Seq[T] = filter(lookup: _*) map(_[T](id))
+
+  def toIntId(lookup: (String, Any)*): Int = toId[Int](lookup: _*)
+  def toIntIdOpt(lookup: (String, Any)*): Option[Int] = toIdOpt[Int](lookup:_*)
+  def toIntIds(lookup: (String, Any)*): Seq[Int] = toIds[Int](lookup:_*)
+
+  def toLongId(lookup:(String, Any)*): Long = toId[Long](lookup:_*)
+  def toLongIdOpt(lookup:(String, Any)*): Option[Long] = toIdOpt[Long](lookup:_*)
+  def toLongIds(lookup:(String, Any)*): Seq[Long] = toIds[Long](lookup:_*)
+
+  def get(id: Long): Option[Row] = getRow(id)
 
   def page(start: Long, pageSize: Int, orderClauses: Seq[OrderBy] = Seq(OrderAsc("id"))): Rows = tx {
     val st = conn.createStatement(); // statement objects can be reused with

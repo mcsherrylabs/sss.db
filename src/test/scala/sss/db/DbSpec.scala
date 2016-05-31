@@ -70,6 +70,18 @@ class DbSpec extends FlatSpec with Matchers with BeforeAndAfter with DbV2Spec {
     assert(row("intVal") === 45)
   }
 
+  it should " support shorthand filter" in {
+
+    val time = new Date()
+    fixture.table.insert(3456, "strId", time, 45)
+    val rows = fixture.table.filter("createTime" -> time)
+    assert(rows.size === 1, "Should only be one row found !")
+    val row = rows(0)
+    assert(row("strId") === "strId")
+    assert(row("createTime") === time.getTime)
+    assert(row("intVal") === 45)
+  }
+
   it should " be able to find the row inserted by id " in {
 
     val time = new Date()
@@ -87,6 +99,20 @@ class DbSpec extends FlatSpec with Matchers with BeforeAndAfter with DbV2Spec {
     fixture.table.find(where(s"id = ?", 99)) match {
       case None => fail("oh oh, failed to find row by id")
       case Some(r) => assert(r("id") === 99)
+    }
+  }
+
+  it should " support shorthand find " in {
+
+    val time = new Date()
+    fixture.table.insert(100, "strId", time, 45)
+    fixture.table.find("id" -> 100) match {
+      case None => fail("oh oh, failed to find row by id")
+      case Some(r) => assert(r("id") === 100)
+    }
+    fixture.table.find("id" -> 100, "strId" -> "strId", "createTime" -> time) match {
+      case None => fail("oh oh, failed to find row ")
+      case Some(r) => assert(r("createTime") === time.getTime)
     }
   }
 
