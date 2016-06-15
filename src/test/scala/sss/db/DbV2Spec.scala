@@ -272,4 +272,24 @@ trait DbV2Spec {
     assert(theIds.filterNot(rowsIds.contains(_)).isEmpty)
 
   }
+
+  it should " get the maximum value of a column " in {
+
+    val table = fixture.dbUnderTest.testIntId
+    val currentMax = table.maxId
+
+    ((0 until 10) map {_ => table.insert(Map("strVal" -> "manyhellos"))})
+
+    assert(table.maxId == currentMax + 10)
+
+    table.delete(where("id > 0"))
+
+    assert(table.maxId == 0)
+
+    ((0 until 10) map {_ => table.insert(Map("strVal" -> "manyhellos"))})
+
+    assert(table.count == 10)
+    assert(table.maxId == currentMax + 20)
+
+  }
 }

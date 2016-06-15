@@ -151,12 +151,27 @@ class View(val name: String, private[db] val ds: DataSource) extends Tx with Log
     }
   }
 
+  def maxId: Long = max(id)
+
+  def max(colName: String): Long = tx {
+    val st = conn.createStatement(); // statement objects can be reused with
+    try {
+      val rs = st.executeQuery(s"SELECT MAX($colName) AS max_val FROM ${name}")
+      if (rs.next) {
+        rs.getLong("max_val")
+      } else DbError(s"Database did not return max($colName) for table: $name")
+    } finally {
+      st.close
+    }
+  }
+
+
   def count: Long = tx {
     val st = conn.createStatement(); // statement objects can be reused with
     try {
       val rs = st.executeQuery(s"SELECT COUNT(*) AS total FROM ${name}")
       if (rs.next) rs.getLong("total")
-      else DbError("Database did not return count for table: $name")
+      else DbError(s"Database did not return count for table: $name")
     } finally {
       st.close
     }
