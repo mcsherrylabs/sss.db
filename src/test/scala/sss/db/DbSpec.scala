@@ -4,11 +4,16 @@ import java.util.Date
 
 import org.scalatest._
 
-class DbSpec extends FlatSpec with Matchers with BeforeAndAfter with DbV2Spec {
+class DbSpec extends FlatSpec with Matchers with BeforeAndAfter with DbV2Spec with PagedViewSpec {
 
   case class TestFixture(dbUnderTest: Db, table: Table)
 
   var fixture: TestFixture = _
+
+  val idCol = "id"
+  val statusCol = "status_col"
+  val testPaged = "testPaged"
+  val testPaged2 = "testPaged2"
 
   before {
     val dbUnderTest = Db("testDb")

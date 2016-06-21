@@ -1,8 +1,9 @@
 
 name := "sss-db"
 
-version := "0.9.25"
+version := "0.9.26"
 
+parallelExecution in Test := false
 
 resolvers += "stepsoft" at "http://nexus.mcsherrylabs.com/nexus/content/groups/public"
 

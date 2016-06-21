@@ -90,7 +90,7 @@ class Table(name: String, ds: DataSource) extends View(name, ds) {
     try {
       val numRows = ps.executeUpdate()
       if (usingVersion && numRows == 0) throw new DbOptimisticLockingException(s"No rows were updated, optimistic lock clash? ${name}:${values}")
-      apply(values(id).asInstanceOf[Long])
+      apply(values(id).asInstanceOf[Number].longValue())
     } finally {
       ps.close
     }
