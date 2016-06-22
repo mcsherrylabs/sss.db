@@ -16,7 +16,7 @@ trait PagedViewSpec {
 
 
   "A paged View" should " be able to handle an empty table " in {
-    val pv = new PagedView[Int](idCol, view, 2, (statusCol -> 0))
+    val pv = new PagedView(idCol, view, 2, (s"$statusCol = ? ", Seq(0)))
     var page = pv.last
     assert(!page.hasNext)
     assert(!page.hasPrev)
@@ -31,7 +31,7 @@ trait PagedViewSpec {
 
     (1 to 10) foreach { i => view.insert(Map(idCol -> i, statusCol -> 0)) }
 
-    val pv = new PagedView[Int](idCol, view, 2, (statusCol -> 0))
+    val pv = new PagedView(idCol, view, 2, (s"$statusCol = ?" -> Seq(0)))
     var page = pv.last
     assert(!page.hasNext)
     assert(page.hasPrev)
@@ -50,7 +50,7 @@ trait PagedViewSpec {
   it should " match expected walk exactly " in {
 
     (1 to 10) foreach { i => view.insert(Map(idCol -> i, statusCol -> 0)) }
-    val pv = new PagedView[Int](idCol, view, 3, (statusCol -> 0))
+    val pv = new PagedView(idCol, view, 3, (s"$statusCol = ?", Seq(0)))
     var page = pv.last
     assert(page.rows.size == 3)
     assert(page.rows(0)[Int](idCol) == 8)
@@ -87,7 +87,7 @@ trait PagedViewSpec {
     (1 to 10) foreach { i => view2.insert(Map(idCol -> i, statusCol -> 0)) }
     Seq(2,4,6,8) foreach { i => view2.update(Map(idCol -> i, statusCol -> 1)) }
 
-    val pv = new PagedView[Int](idCol, view2, 2, (statusCol -> 0))
+    val pv = new PagedView(idCol, view2, 2, (s"$statusCol = ?", Seq(0)))
     var page = pv.last
     assert(!page.hasNext)
     assert(page.hasPrev)
