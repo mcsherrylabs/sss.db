@@ -50,7 +50,7 @@ trait Tx extends Logging {
       r
     } catch {
       case NonFatal(e) =>
-        log.warn("ROLLING BACK!", e)
+        log.debug("ROLLING BACK!", e)
         conn.rollback
         throw e
     } finally {
