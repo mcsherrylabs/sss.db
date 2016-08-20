@@ -132,6 +132,7 @@ class Db(dbConfig: DbConfig) extends Logging with Dynamic with Tx {
     hikariConfig.setUsername(dbConfig.user)
     hikariConfig.setPassword(dbConfig.pass)
     hikariConfig.setAutoCommit(false)
+    hikariConfig.setIsolateInternalQueries(true)
 
     hikariConfig.setMaximumPoolSize(dbConfig.maxPoolSize)
     dbConfig.testQueryOpt map (hikariConfig.setConnectionTestQuery(_))

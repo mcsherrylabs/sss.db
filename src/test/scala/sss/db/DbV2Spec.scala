@@ -215,6 +215,7 @@ trait DbV2Spec {
 
   }
 
+
   it should " NOT support find along wrapped binary arrays (use .array)" in {
 
     val testStr = "Hello My Friend"
