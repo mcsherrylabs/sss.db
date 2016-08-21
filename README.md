@@ -58,3 +58,13 @@ Make several updates in a single transaction ... ('tx' is an alias for 'inTransa
     myOtherTable.persist(Map("myTableId" -> row("id"), "payload" -> "associated info 2")
  }
  ```
+
+Note that when working with Byte Arrays, extracting to a byte array must happen *inside* the transaction. Otherwise the 
+blob is not guaranteed to be available.  
+ ```
+ table.tx {
+       val found = table.find(Where("blobVal = ?", bytes))
+       assert(found.isDefined)
+       assert(found.get[Array[Byte]]("blobVal") === bytes) <- apply[Array[Byte]]("blobVal") INSIDE tx....
+     }
+ ```

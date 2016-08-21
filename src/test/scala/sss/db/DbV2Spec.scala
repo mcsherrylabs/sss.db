@@ -186,9 +186,11 @@ trait DbV2Spec {
 
     val testStr = "Hello My Friend"
     val table = fixture.dbUnderTest.testBinary
-    val m = table.persist(Map("blobVal" -> testStr.getBytes))
-    assert(m[Array[Byte]]("blobVal") === testStr.getBytes)
-    assert(new String(m[Array[Byte]]("blobVal")) === testStr)
+    table.tx {
+      val m = table.persist(Map("blobVal" -> testStr.getBytes))
+      assert(m[Array[Byte]]("blobVal") === testStr.getBytes)
+      assert(new String(m[Array[Byte]]("blobVal")) === testStr)
+    }
 
   }
 
@@ -197,9 +199,11 @@ trait DbV2Spec {
     val testStr = "Hello My Friend"
     val table = fixture.dbUnderTest.testBinary
     val wAry : mutable.WrappedArray[Byte] = testStr.getBytes
-    val m = table.persist(Map("blobVal" -> wAry))
-    assert(m[mutable.WrappedArray[Byte]]("blobVal") === wAry)
-    assert(new String(m[mutable.WrappedArray[Byte]]("blobVal").array) === testStr)
+    table.tx {
+      val m = table.persist(Map("blobVal" -> wAry))
+      assert(m[mutable.WrappedArray[Byte]]("blobVal") === wAry)
+      assert(new String(m[mutable.WrappedArray[Byte]]("blobVal").array) === testStr)
+    }
 
   }
   it should " support find along binary arrays " in {
@@ -209,9 +213,11 @@ trait DbV2Spec {
     val bytes = testStr.getBytes
     table.persist(Map("blobVal" -> bytes))
 
-    val found = table.find(Where("blobVal = ?", bytes))
-    assert( found.isDefined)
-    assert(found.get[Array[Byte]]("blobVal") === bytes)
+    table.tx {
+      val found = table.find(Where("blobVal = ?", bytes))
+      assert(found.isDefined)
+      assert(found.get[Array[Byte]]("blobVal") === bytes)
+    }
 
   }
 
@@ -223,9 +229,11 @@ trait DbV2Spec {
     val wAry : mutable.WrappedArray[Byte] = testStr.getBytes
     val m = table.persist(Map("blobVal" -> wAry))
 
-    val found = table.find(Where("blobVal = ?", wAry.array))
-    assert( found.isDefined)
-    assert(found.get[mutable.WrappedArray[Byte]]("blobVal") === wAry)
+    table.tx {
+      val found = table.find(Where("blobVal = ?", wAry.array))
+      assert(found.isDefined)
+      assert(found.get[mutable.WrappedArray[Byte]]("blobVal") === wAry)
+    }
 
   }
 
