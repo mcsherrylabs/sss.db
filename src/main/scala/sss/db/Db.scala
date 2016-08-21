@@ -35,6 +35,7 @@ trait DbConfig {
   val useServerPrepStmts: Boolean
   val driver: String
   val connection: String
+  val connectionProperties: String
   val user: String
   val pass: String
   val useShutdownHook: Boolean
@@ -128,7 +129,14 @@ class Db(dbConfig: DbConfig) extends Logging with Dynamic with Tx {
 
     val hikariConfig = new HikariConfig()
     hikariConfig.setDriverClassName(dbConfig.driver)
-    hikariConfig.setJdbcUrl(dbConfig.connection)
+    val connPlusProps = {
+      if(!dbConfig.connectionProperties.startsWith(";") && dbConfig.connectionProperties.length > 0) {
+        dbConfig.connection + ";" + dbConfig.connectionProperties
+
+      } else dbConfig.connection + dbConfig.connectionProperties
+    }
+    hikariConfig.setJdbcUrl(connPlusProps)
+
     hikariConfig.setUsername(dbConfig.user)
     hikariConfig.setPassword(dbConfig.pass)
     hikariConfig.setAutoCommit(false)
