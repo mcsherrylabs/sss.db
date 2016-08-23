@@ -29,6 +29,7 @@ object Db {
 trait DbConfig {
   val testQueryOpt: Option[String]
   val maxPoolSize: Int
+  val freeBlobsEarly: Boolean
   val cachePrepStmts : Boolean
   val prepStmtCacheSize: Int
   val prepStmtCacheSqlLimit: Int
@@ -89,9 +90,9 @@ class Db(dbConfig: DbConfig) extends Logging with Dynamic with Tx {
 
   def selectDynamic(tableName: String) = table(tableName)
 
-  def table(name: String): Table =  tables.getOrElseUpdate(name, new Table(name, ds))
+  def table(name: String): Table =  tables.getOrElseUpdate(name, new Table(name, ds, dbConfig.freeBlobsEarly))
 
-  def view(name: String): View = new View(name, ds)
+  def view(name: String): View = new View(name, ds, dbConfig.freeBlobsEarly)
 
   def dropView(viewName: String) = executeSql(s"DROP VIEW ${viewName}")
 

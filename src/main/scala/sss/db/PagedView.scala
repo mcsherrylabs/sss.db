@@ -1,16 +1,18 @@
 package sss.db
-
-import scala.reflect.runtime.universe._
 /**
   * Created by alan on 6/21/16.
   */
-
 trait Page {
   val rows: Rows
   val next: Page
   val prev: Page
   val hasNext: Boolean
   val hasPrev: Boolean
+  /**
+    * An enclosing tx may be necessary if the rows contain Blobs, and early blob freeing is not
+    * true. In this case, the blobs are only guaranteed to live until the tx is closed.
+    */
+  def tx[T](f: => T)
 }
 
 case class PageImpl(indexCol: String, view: View, rows: Rows, pageSize: Int, filter: (String, Seq[Any])) extends Page {
@@ -19,6 +21,8 @@ case class PageImpl(indexCol: String, view: View, rows: Rows, pageSize: Int, fil
 
   private val firstIndexInPage = rows.head[Number](indexCol).longValue
   private val lastIndexInPage = rows.last[Number](indexCol).longValue
+
+  override def tx[T](f: => T) = view.tx[T](f)
 
   lazy private val filterClause = if(filter._1.isEmpty) "" else s" AND ${filter._1}"
 
@@ -51,6 +55,7 @@ case class EmptyPage(pagedView: PagedView) extends Page {
   lazy override val prev: Page = pagedView.first
   override val hasPrev: Boolean = false
   override val hasNext: Boolean = false
+  def tx[T](f: => T) = pagedView.tx(f)
 }
 
 object PagedView {
@@ -61,6 +66,12 @@ object PagedView {
 
 class PagedView(indexCol: String, view:View,
                pageSize: Int, filter: (String, Seq[Any])) {
+
+  /**
+    * An enclosing tx may be necessary if the rows contain Blobs, and early blob freeing is not
+    * true. In this case, the blobs are only guaranteed to live until the tx is closed.
+    */
+  def tx[T](f: => T) = view.tx[T](f)
 
   def last: Page = {
 

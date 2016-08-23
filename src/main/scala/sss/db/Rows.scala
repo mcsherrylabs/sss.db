@@ -1,13 +1,17 @@
 package sss.db
 
+
 import java.sql.ResultSet
+
+import org.hsqldb.jdbc.JDBCBlobClient
 
 import scala.annotation.tailrec
 
-object Rows {
-  def apply(rs: ResultSet): Rows = parse(rs)
 
-  def parse(rs: ResultSet): Rows = {
+object Rows {
+  def apply(rs: ResultSet, freeBlobsEarly: Boolean): Rows = parse(rs, freeBlobsEarly)
+
+  def parse(rs: ResultSet,freeBlobsEarly: Boolean): Rows = {
 
     try {
 
@@ -20,7 +24,15 @@ object Rows {
           var r = Map[String, Any]()
           for (i <- 0 until colmax) {
             val o = rs.getObject(i + 1); // Is SQL the first column is indexed
-            r = r + (meta.getColumnName(i + 1).toLowerCase -> o)
+            if(freeBlobsEarly && o.isInstanceOf[JDBCBlobClient]) {
+              val jDBCBlobClient = o.asInstanceOf[JDBCBlobClient]
+              try {
+                val asByteAry = jDBCBlobClient.getBytes(1, jDBCBlobClient.length.toInt)
+                r = r + (meta.getColumnName(i + 1).toLowerCase -> asByteAry)
+              } finally jDBCBlobClient.free()
+            } else {
+              r = r + (meta.getColumnName(i + 1).toLowerCase -> o)
+            }
           }
           parse(rows :+ (r: Row), rs)
         } else rows

@@ -11,7 +11,7 @@ import scala.collection.mutable
 import scala.reflect.runtime.universe._
 
 
-class View(val name: String, private[db] val ds: DataSource) extends Tx with Logging {
+class View(val name: String, private[db] val ds: DataSource, freeBlobsEarly: Boolean) extends Tx with Logging {
 
   protected val id = "id"
   protected val version = "version"
@@ -83,7 +83,7 @@ class View(val name: String, private[db] val ds: DataSource) extends Tx with Log
     try {
       val clause = orderByClausesToString(orderClauses)
       val rs = st.executeQuery(selectSql + clause) // run the query
-      Rows(rs).map(f)
+      Rows(rs,freeBlobsEarly).map(f)
     } finally {
       st.close()
     }
@@ -100,7 +100,7 @@ class View(val name: String, private[db] val ds: DataSource) extends Tx with Log
     val ps = prepareStatement(s"${selectSql} WHERE ${where.clause}", where.params) // run the query
     try {
       val rs = ps.executeQuery
-      Rows(rs)
+      Rows(rs, freeBlobsEarly)
     } finally {
       ps.close
     }
@@ -145,7 +145,7 @@ class View(val name: String, private[db] val ds: DataSource) extends Tx with Log
     try {
       val orderClausesStr = orderByClausesToString(orderClauses)
       val rs = st.executeQuery(s"${selectSql} $orderClausesStr LIMIT ${start}, ${pageSize}")
-      Rows(rs)
+      Rows(rs, freeBlobsEarly)
     } finally {
       st.close
     }

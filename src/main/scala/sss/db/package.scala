@@ -3,9 +3,11 @@ package sss
 import java.io.InputStream
 import java.math.BigDecimal
 
+import com.sun.xml.internal.messaging.saaj.util.ByteInputStream
 import org.hsqldb.jdbc.JDBCBlobClient
 
 import scala.collection.mutable
+import scala.collection.mutable.WrappedArray
 import scala.language.implicitConversions
 /**
  * @author alan
@@ -22,7 +24,7 @@ package object db {
 
   type Rows = IndexedSeq[Row]
 
-  type ColumnTypes = String with Long with Short with Integer with Int with Float with Boolean with BigDecimal with Byte with Double with scala.collection.mutable.WrappedArray[Byte] with Array[Byte] with java.sql.Date with java.sql.Time with java.sql.Timestamp with java.sql.Clob with java.sql.Blob with java.sql.Array with java.sql.Ref with java.sql.Struct
+  type ColumnTypes = String with Long with Short with Integer with Int with Float with Boolean with BigDecimal with Byte with Double with scala.collection.mutable.WrappedArray[Byte] with Array[Byte] with java.sql.Date with java.sql.Time with java.sql.Timestamp with java.sql.Clob with java.sql.Blob with java.sql.Array with java.sql.Ref with java.sql.Struct with InputStream
 
   implicit def toMap(r: Row): Map[String, _] = r.asMap
 
@@ -62,10 +64,18 @@ package object db {
     def apply[T >: ColumnTypes: TypeTag](col: String): T = {
 
       val rawVal = asMap(col.toLowerCase)
-      val massaged = if(typeOf[T] == typeOf[Array[Byte]]) blobToBytes(rawVal.asInstanceOf[JDBCBlobClient])
-      else if (typeOf[T] == typeOf[mutable.WrappedArray[Byte]]) blobToWrappedBytes(rawVal.asInstanceOf[JDBCBlobClient])
-      else if (typeOf[T] == typeOf[InputStream]) blobToStream(rawVal.asInstanceOf[JDBCBlobClient])
-      else rawVal
+      val massaged = if(typeOf[T] == typeOf[Array[Byte]] && rawVal.isInstanceOf[JDBCBlobClient]) {
+        blobToBytes(rawVal.asInstanceOf[JDBCBlobClient])
+      } else if (typeOf[T] == typeOf[mutable.WrappedArray[Byte]] && rawVal.isInstanceOf[JDBCBlobClient]) {
+        blobToWrappedBytes(rawVal.asInstanceOf[JDBCBlobClient])
+      } else if (typeOf[T] == typeOf[mutable.WrappedArray[Byte]] && rawVal.isInstanceOf[Array[Byte]]) {
+        new WrappedArray.ofByte(rawVal.asInstanceOf[Array[Byte]])
+      } else if (typeOf[T] == typeOf[InputStream] && rawVal.isInstanceOf[JDBCBlobClient]) {
+        blobToStream(rawVal.asInstanceOf[JDBCBlobClient])
+      } else if (typeOf[T] == typeOf[InputStream] && rawVal.isInstanceOf[Array[Byte]]) {
+        val aryByte = rawVal.asInstanceOf[Array[Byte]]
+        new ByteInputStream(aryByte, aryByte.length)
+      } else rawVal
 
       massaged.asInstanceOf[T]
     }

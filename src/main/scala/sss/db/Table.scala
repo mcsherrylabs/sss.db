@@ -64,7 +64,7 @@ private[db] case class ConnectionTracker(conn: Connection, count: Int)
 
 private[db] object Tx extends ThreadLocal[ConnectionTracker]
 
-class Table(name: String, ds: DataSource) extends View(name, ds) {
+class Table(name: String, ds: DataSource, freeBlobsEarly: Boolean) extends View(name, ds, freeBlobsEarly) {
 
   @throws[DbOptimisticLockingException]("if the row has been updated after you read it")
   def update(values: Map[String, Any]): Row = inTransaction {

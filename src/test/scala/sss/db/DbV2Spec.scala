@@ -1,5 +1,6 @@
 package sss.db
 
+import java.io.{DataInputStream, InputStream}
 import java.util.Date
 
 import scala.collection.mutable
@@ -217,10 +218,10 @@ trait DbV2Spec {
       val found = table.find(Where("blobVal = ?", bytes))
       assert(found.isDefined)
       assert(found.get[Array[Byte]]("blobVal") === bytes)
+      assert(new String(found.get[mutable.WrappedArray[Byte]]("blobVal").array) === testStr)
     }
 
   }
-
 
   it should " NOT support find along wrapped binary arrays (use .array)" in {
 
@@ -233,6 +234,27 @@ trait DbV2Spec {
       val found = table.find(Where("blobVal = ?", wAry.array))
       assert(found.isDefined)
       assert(found.get[mutable.WrappedArray[Byte]]("blobVal") === wAry)
+      assert(new String(found.get[mutable.WrappedArray[Byte]]("blobVal").array) === testStr)
+    }
+
+  }
+
+  it should " support inputstream result " in {
+
+    val testStr = "Hello My Friend"
+    val table = fixture.dbUnderTest.testBinary
+    val bytes = testStr.getBytes
+    table.persist(Map("blobVal" -> bytes))
+
+    table.tx {
+      val found = table.find(Where("blobVal = ?", bytes))
+      assert(found.isDefined)
+      val is = found.get[InputStream]("blobVal")
+      val readBytes = new Array[Byte](bytes.length)
+      val dataIs = new DataInputStream(is)
+      dataIs.readFully(readBytes)
+      assert(readBytes === bytes)
+      assert(new String(readBytes) === testStr)
     }
 
   }
