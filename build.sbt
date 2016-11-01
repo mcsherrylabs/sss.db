@@ -3,16 +3,15 @@ name := "sss-db"
 
 version := "0.9.33"
 
-
-resolvers += "stepsoft" at "http://nexus.mcsherrylabs.com/nexus/content/groups/public"
+scalaVersion := "2.11.8"
 
 libraryDependencies += "joda-time" % "joda-time" % "2.8.2"
 
 libraryDependencies += "org.scalatest" %% "scalatest" % "2.2.4" % "test"
 
-libraryDependencies += "org.hsqldb" % "hsqldb" % "2.3.4"
+libraryDependencies += "org.hsqldb" % "hsqldb" % "2.3.4" % Test
 
-libraryDependencies += "mcsherrylabs.com" %% "sss-ancillary" % "0.9.13"
+libraryDependencies += "com.mcsherrylabs" % "sss-ancillary_2.11" % "1.0"
 
 libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.1.2"
 

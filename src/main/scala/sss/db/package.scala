@@ -2,9 +2,9 @@ package sss
 
 import java.io.InputStream
 import java.math.BigDecimal
+import java.sql.Blob
 
 import com.sun.xml.internal.messaging.saaj.util.ByteInputStream
-import org.hsqldb.jdbc.JDBCBlobClient
 
 import scala.collection.mutable
 import scala.collection.mutable.WrappedArray
@@ -64,14 +64,14 @@ package object db {
     def apply[T >: ColumnTypes: TypeTag](col: String): T = {
 
       val rawVal = asMap(col.toLowerCase)
-      val massaged = if(typeOf[T] == typeOf[Array[Byte]] && rawVal.isInstanceOf[JDBCBlobClient]) {
-        blobToBytes(rawVal.asInstanceOf[JDBCBlobClient])
-      } else if (typeOf[T] == typeOf[mutable.WrappedArray[Byte]] && rawVal.isInstanceOf[JDBCBlobClient]) {
-        blobToWrappedBytes(rawVal.asInstanceOf[JDBCBlobClient])
+      val massaged = if(typeOf[T] == typeOf[Array[Byte]] && rawVal.isInstanceOf[Blob]) {
+        blobToBytes(rawVal.asInstanceOf[Blob])
+      } else if (typeOf[T] == typeOf[mutable.WrappedArray[Byte]] && rawVal.isInstanceOf[Blob]) {
+        blobToWrappedBytes(rawVal.asInstanceOf[Blob])
       } else if (typeOf[T] == typeOf[mutable.WrappedArray[Byte]] && rawVal.isInstanceOf[Array[Byte]]) {
         new WrappedArray.ofByte(rawVal.asInstanceOf[Array[Byte]])
-      } else if (typeOf[T] == typeOf[InputStream] && rawVal.isInstanceOf[JDBCBlobClient]) {
-        blobToStream(rawVal.asInstanceOf[JDBCBlobClient])
+      } else if (typeOf[T] == typeOf[InputStream] && rawVal.isInstanceOf[Blob]) {
+        blobToStream(rawVal.asInstanceOf[Blob])
       } else if (typeOf[T] == typeOf[InputStream] && rawVal.isInstanceOf[Array[Byte]]) {
         val aryByte = rawVal.asInstanceOf[Array[Byte]]
         new ByteInputStream(aryByte, aryByte.length)
@@ -80,9 +80,9 @@ package object db {
       massaged.asInstanceOf[T]
     }
 
-    private def blobToStream(jDBCBlobClient: JDBCBlobClient): InputStream = jDBCBlobClient.getBinaryStream
-    private def blobToBytes(jDBCBlobClient: JDBCBlobClient): Array[Byte]= jDBCBlobClient.getBytes(1, jDBCBlobClient.length.toInt)
-    private def blobToWrappedBytes(jDBCBlobClient: JDBCBlobClient): mutable.WrappedArray[Byte]= jDBCBlobClient.getBytes(1, jDBCBlobClient.length.toInt)
+    private def blobToStream(jDBCBlobClient: Blob): InputStream = jDBCBlobClient.getBinaryStream
+    private def blobToBytes(jDBCBlobClient: Blob): Array[Byte]= jDBCBlobClient.getBytes(1, jDBCBlobClient.length.toInt)
+    private def blobToWrappedBytes(jDBCBlobClient: Blob): mutable.WrappedArray[Byte]= jDBCBlobClient.getBytes(1, jDBCBlobClient.length.toInt)
 
     override def toString: String = {
       asMap.foldLeft("") { case (a, (k, v)) => a + s" Key:${k}, Value: ${v}" }

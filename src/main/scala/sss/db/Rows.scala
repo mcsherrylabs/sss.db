@@ -1,9 +1,7 @@
 package sss.db
 
 
-import java.sql.ResultSet
-
-import org.hsqldb.jdbc.JDBCBlobClient
+import java.sql.{Blob, ResultSet}
 
 import scala.annotation.tailrec
 
@@ -24,8 +22,8 @@ object Rows {
           var r = Map[String, Any]()
           for (i <- 0 until colmax) {
             val o = rs.getObject(i + 1); // Is SQL the first column is indexed
-            if(freeBlobsEarly && o.isInstanceOf[JDBCBlobClient]) {
-              val jDBCBlobClient = o.asInstanceOf[JDBCBlobClient]
+            if(freeBlobsEarly && o.isInstanceOf[Blob]) {
+              val jDBCBlobClient = o.asInstanceOf[Blob]
               try {
                 val asByteAry = jDBCBlobClient.getBytes(1, jDBCBlobClient.length.toInt)
                 r = r + (meta.getColumnName(i + 1).toLowerCase -> asByteAry)
