@@ -153,7 +153,7 @@ class Table(name: String, ds: DataSource, freeBlobsEarly: Boolean) extends View(
 
   def delete(where: Where): Int = tx[Int] {
 
-    val ps = prepareStatement(s"DELETE FROM ${name} WHERE ${where.expand}", where.params)
+    val ps = prepareStatement(s"DELETE FROM ${name} WHERE ${where.clause}", where.params)
     try {
       ps.executeUpdate(); // run the query
     } finally {

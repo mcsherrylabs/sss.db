@@ -43,7 +43,7 @@ trait DbV2Spec {
 
     val time = new Date()
     val r1 = fixture.table.persist(Map(("strId" -> "strId"), ("createTime" -> time), ("intVal" -> 45)))
-    val r2 = fixture.table.find(where("id = ?") using r1("id"))
+    val r2 = fixture.table.find(where(ps"id = ${r1("id")}"))
     assert(r1 == r2.get)
 
   }
@@ -83,7 +83,7 @@ trait DbV2Spec {
     val r1 = fixture.table.persist(Map(("strId" -> "strId"), ("createTime" -> time), ("intVal" -> 45)))
     val r2 = fixture.table.find(Where("id = ?", r1("id")))
     assert(r1 == r2.get)
-    val deletedRowCount = fixture.table.delete(where("id = __all__", r1("id")))
+    val deletedRowCount = fixture.table.delete(where(ps"id = ${r1("id")}"))
     assert(deletedRowCount === 1)
     assert(fixture.table.find(where("id = ?", r1("id"))) == None)
   }
@@ -183,6 +183,20 @@ trait DbV2Spec {
     }
   }
 
+  it should " support persisting a byte as Binary" in {
+
+    val testByte: Byte = 34
+    val table = fixture.dbUnderTest.testBinary
+    table.tx {
+      val m = table.persist(Map("byteVal" -> testByte))
+      assert(m[Byte]("byteVal") === testByte)
+      val empty = table.persist(Map("byteVal" -> None))
+      assert(empty[Byte]("byteVal") === null)
+      assert(empty[Option[Byte]]("byteVal") === None)
+    }
+
+  }
+
   it should " support persisting binary arrays as a blob " in {
 
     val testStr = "Hello My Friend"
@@ -223,7 +237,7 @@ trait DbV2Spec {
 
   }
 
-  it should " NOT support find along wrapped binary arrays (use .array)" in {
+  it should " NOT support find along wrapped binary arrays (you must use .array)" in {
 
     val testStr = "Hello My Friend"
     val table = fixture.dbUnderTest.testBinary

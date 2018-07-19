@@ -2,27 +2,8 @@ package sss.db
 
 import java.util.Date
 
-import org.scalatest._
+class DbSpec extends DbSpecSetup with DbV2Spec with PagedViewSpec {
 
-class DbSpec extends FlatSpec with Matchers with BeforeAndAfter with DbV2Spec with PagedViewSpec {
-
-  case class TestFixture(dbUnderTest: Db, table: Table)
-
-  var fixture: TestFixture = _
-
-  val idCol = "id"
-  val statusCol = "status_col"
-  val testPaged = "testPaged"
-  val testPaged2 = "testPaged2"
-
-  before {
-    val dbUnderTest = Db("testDb")
-    fixture = TestFixture(dbUnderTest, dbUnderTest.table("test"))
-  }
-
-  after {
-    fixture.dbUnderTest.shutdown
-  }
 
   it should " allow insert into existing table " in {
 
@@ -67,7 +48,7 @@ class DbSpec extends FlatSpec with Matchers with BeforeAndAfter with DbV2Spec wi
 
     val time = new Date()
     fixture.table.insert(0, "strId", time, 45)
-    val rows = fixture.table.filter(where("createTime = ?", time.getTime))
+    val rows = fixture.table.filter(where(ps"createTime = ${time.getTime}"))
     assert(rows.size === 1, "Should only be one row found !")
     val row = rows(0)
     assert(row("strId") === "strId")
@@ -147,7 +128,7 @@ class DbSpec extends FlatSpec with Matchers with BeforeAndAfter with DbV2Spec wi
     }
 
     try {
-      fixture.table.find(where("id = ?", 999999)) match {
+      fixture.table.find(idCol -> 999999) match {
         case Some(r) => fail("there is a row with 999999,  should have thrown ex ...")
         case x =>
       }
@@ -165,7 +146,7 @@ class DbSpec extends FlatSpec with Matchers with BeforeAndAfter with DbV2Spec wi
     }
 
     try {
-      fixture.table.find(where("id = ?", 999999)) match {
+      fixture.table.find(where(ps"id = ${999999}")) match {
         case Some(r) =>
         case x => fail("there is no row with 999999...")
       }

@@ -31,12 +31,11 @@ case class PageImpl(indexCol: String, view: View, rows: Rows, pageSize: Int, fil
     else throw new IllegalAccessException("No next page")
 
   private lazy val nextRows = view.filter(
-    where (s"$indexCol > ? ${filterClause} ORDER BY $indexCol ASC LIMIT $pageSize")
-      using ((lastIndexInPage +: filter._2):_*))
+    where (s"$indexCol > ? ${filterClause} ORDER BY $indexCol ASC LIMIT $pageSize"
+      , (lastIndexInPage +: filter._2):_*))
 
   private lazy val prevRows = view.filter(
-    where (s"$indexCol < ? ${filterClause} ORDER BY $indexCol DESC LIMIT $pageSize")
-      using ((firstIndexInPage +: filter._2):_*))
+    where (s"$indexCol < ? ${filterClause} ORDER BY $indexCol DESC LIMIT $pageSize", (firstIndexInPage +: filter._2):_*))
 
 
   lazy override val prev: Page = {
@@ -75,13 +74,13 @@ class PagedView(indexCol: String, view:View,
 
   def last: Page = {
 
-    val rows = view.filter(where (s"${filter._1} ORDER BY $indexCol DESC LIMIT $pageSize") using (filter._2: _*))
+    val rows = view.filter(where (s"${filter._1} ORDER BY $indexCol DESC LIMIT $pageSize", filter._2: _*))
     if(rows.isEmpty) EmptyPage(this)
     else PageImpl(indexCol, view, rows.reverse, pageSize, filter)
   }
 
   def first: Page = {
-    val rows = view.filter(where (s"${filter._1} ORDER BY $indexCol ASC LIMIT $pageSize") using (filter._2: _*))
+    val rows = view.filter(where (s"${filter._1} ORDER BY $indexCol ASC LIMIT $pageSize", filter._2: _*))
     if(rows.isEmpty) EmptyPage(this)
     else PageImpl(indexCol, view, rows, pageSize, filter)
   }

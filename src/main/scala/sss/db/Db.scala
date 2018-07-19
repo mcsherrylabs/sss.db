@@ -6,8 +6,8 @@ import com.twitter.util.SynchronizedLruMap
 import com.typesafe.config.Config
 import com.zaxxer.hikari.{HikariConfig, HikariDataSource}
 import sss.ancillary.{DynConfig, Logging}
+import collection.JavaConverters._
 
-import scala.collection.JavaConversions._
 import scala.collection.mutable.{Map => MMap}
 import scala.language.dynamics
 
@@ -61,7 +61,7 @@ class Db(dbConfig: DbConfig) extends Logging with Dynamic with Tx {
 
     dbConfig.deleteSqlOpt foreach { deleteSqlAry =>
 
-      deleteSqlAry.foreach { deleteSql =>
+      deleteSqlAry.asScala foreach { deleteSql =>
         if (deleteSql.length > 0) {
           try {
             val deleted = executeSql(deleteSql)
@@ -74,7 +74,7 @@ class Db(dbConfig: DbConfig) extends Logging with Dynamic with Tx {
 
     }
     dbConfig.createSqlOpt foreach { createSqlAry =>
-      createSqlAry foreach { createSql =>
+      createSqlAry.asScala foreach { createSql =>
         if (createSql.length > 0) {
           try {
             val created = executeSql(createSql)

@@ -32,8 +32,8 @@ object Rows {
               r = r + (meta.getColumnName(i + 1).toLowerCase -> o)
             }
           }
-          parse(rows :+ (r: Row), rs)
-        } else rows
+          parse((r: Row) +: rows, rs)
+        } else rows.reverse
       }
 
       parse(IndexedSeq[Row](), rs)

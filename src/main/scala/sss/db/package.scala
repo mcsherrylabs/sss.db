@@ -24,7 +24,37 @@ package object db {
 
   type Rows = IndexedSeq[Row]
 
-  type ColumnTypes = String with Long with Short with Integer with Int with Float with Boolean with BigDecimal with Byte with Double with scala.collection.mutable.WrappedArray[Byte] with Array[Byte] with java.sql.Date with java.sql.Time with java.sql.Timestamp with java.sql.Clob with java.sql.Blob with java.sql.Array with java.sql.Ref with java.sql.Struct with InputStream
+  type SimpleColumnTypes =
+      String with
+      Long with
+      Short with
+      Integer with
+      Int with
+      Float with
+      Boolean with
+      BigDecimal with
+      Byte with
+      Double with
+      scala.collection.mutable.WrappedArray[Byte] with
+      Array[Byte] with
+      java.sql.Date with
+      java.sql.Time with
+      java.sql.Timestamp with
+      java.sql.Clob with
+      java.sql.Blob with
+      java.sql.Array with
+      java.sql.Ref with
+      java.sql.Struct with
+      InputStream
+
+  type ColumnTypes = SimpleColumnTypes with Option[SimpleColumnTypes]
+
+
+  implicit class SqlHelper(val sc: StringContext) extends AnyVal {
+    def ps(args: Any*): (String, Seq[Any]) = {
+      (sc.parts.mkString("?"), args)
+    }
+  }
 
   implicit def toMap(r: Row): Map[String, _] = r.asMap
 
@@ -33,19 +63,10 @@ package object db {
   sealed case class OrderAsc(colName: String) extends OrderBy
 
   sealed case class Where(clause: String, params: Any*) {
-    private[db] def expand: String = {
-      if (clause.contains("__all__")) {
-        val all = params.map { _ => "? " }.mkString(",")
-        clause.replace("__all__", all)
-      } else clause
-    }
     def apply(prms: Any*): Where = Where(clause = clause, params = prms: _*)
   }
 
-  class WhereBuilder(sql: String) {
-    def using(params: Any*): Where = Where(sql, params: _*)
-  }
-  def where(sql: String): WhereBuilder = new WhereBuilder(sql)
+  def where(sqlParams: (String, Seq[Any])): Where = Where(sqlParams._1, sqlParams._2: _*)
   def where(sql: String, params: Any*): Where = Where(sql, params: _*)
 
   import scala.reflect.runtime.universe._
@@ -64,7 +85,9 @@ package object db {
     def apply[T >: ColumnTypes: TypeTag](col: String): T = {
 
       val rawVal = asMap(col.toLowerCase)
-      val massaged = if(typeOf[T] == typeOf[Array[Byte]] && rawVal.isInstanceOf[Blob]) {
+      val massaged = if (typeOf[T] <:< typeOf[Option[_]] && rawVal == null) {
+        None
+      } else if (typeOf[T] == typeOf[Array[Byte]] && rawVal.isInstanceOf[Blob]) {
         blobToBytes(rawVal.asInstanceOf[Blob])
       } else if (typeOf[T] == typeOf[mutable.WrappedArray[Byte]] && rawVal.isInstanceOf[Blob]) {
         blobToWrappedBytes(rawVal.asInstanceOf[Blob])
@@ -72,10 +95,16 @@ package object db {
         new WrappedArray.ofByte(rawVal.asInstanceOf[Array[Byte]])
       } else if (typeOf[T] == typeOf[InputStream] && rawVal.isInstanceOf[Blob]) {
         blobToStream(rawVal.asInstanceOf[Blob])
+      } else if (typeOf[T] == typeOf[Byte] && rawVal.isInstanceOf[Array[Byte]]) {
+        val aryByte = rawVal.asInstanceOf[Array[Byte]]
+        assert(aryByte.length == 1)
+        aryByte(0)
       } else if (typeOf[T] == typeOf[InputStream] && rawVal.isInstanceOf[Array[Byte]]) {
         val aryByte = rawVal.asInstanceOf[Array[Byte]]
         new ByteInputStream(aryByte, aryByte.length)
-      } else rawVal
+      } else if (typeOf[T] == typeOf[Option[_]])
+        Some(rawVal)
+      else rawVal
 
       massaged.asInstanceOf[T]
     }

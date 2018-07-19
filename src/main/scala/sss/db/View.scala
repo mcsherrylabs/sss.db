@@ -31,6 +31,7 @@ class View(val name: String, private[db] val ds: DataSource, freeBlobsEarly: Boo
       case v: Int => v
       case v: Long => v
       case v: Double => v
+      case v: Byte => Array(v)
       case v: Array[Byte] => v
       case v: mutable.WrappedArray[_] => v.array
       case v: scala.math.BigDecimal => v.bigDecimal
@@ -76,6 +77,8 @@ class View(val name: String, private[db] val ds: DataSource, freeBlobsEarly: Boo
   }
 
   def getRow(id: Long): Option[Row] = getRow(Where("id = ?", id))
+
+  def flatMap[B](f: Row => View): IndexedSeq[B] = ???
 
   def map[B](f: Row => B, orderClauses: OrderBy*): IndexedSeq[B] = tx {
 

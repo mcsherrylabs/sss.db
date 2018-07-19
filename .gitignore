@@ -18,3 +18,15 @@ project/plugins/project/
 .worksheet
 /bin/
 .idea/
+
+test.lobs
+test.properties
+test.script
+testconn.lobs
+testconn.properties
+testconn.script
+
+.project
+.settings
+.classpath
+.cache-*
