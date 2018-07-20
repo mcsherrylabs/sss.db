@@ -2,21 +2,37 @@ package sss.db
 
 import java.sql.{Connection, PreparedStatement}
 import java.util.Date
-import javax.sql.DataSource
 
+import javax.sql.DataSource
 import org.joda.time.LocalDate
 import sss.ancillary.Logging
 
 import scala.collection.mutable
 import scala.reflect.runtime.universe._
 
-
-class View(val name: String, private[db] val ds: DataSource, freeBlobsEarly: Boolean) extends Tx with Logging {
+/**
+  *
+  * @param name
+  * @param ds
+  * @param freeBlobsEarly
+  *
+  * Note on idomatic try/finally. 'Try' doesn't add much here as I want to close the resource and
+  * propagate the *Exception* see List.head source for example. Anything I expect to happen and
+  * can recover from is not by (my) definition an Exception!
+  *
+  */
+class View(val name: String,
+           private[db] val ds: DataSource,
+           freeBlobsEarly: Boolean,
+           columns: String = "*")
+  extends Tx
+  with Logging {
 
   protected val id = "id"
   protected val version = "version"
 
-  private val selectSql = s"SELECT * from ${name}"
+  private val selectSql = s"SELECT ${columns} from ${name}"
+
   private[db] def conn: Connection = Tx.get.conn
 
   private[db] def mapToSql(value: Any): Any = {
@@ -54,7 +70,7 @@ class View(val name: String, private[db] val ds: DataSource, freeBlobsEarly: Boo
     val asMap = lookup.toMap
     val sqls = asMap.keys.map {k => s"$k = ?"}
     val sql = sqls.mkString(" AND ")
-    Where(sql, asMap.values.toSeq :_*)
+    new Where(sql, asMap.values.toSeq)
   }
 
   private def orderByClausesToString(orderClauses: Seq[OrderBy]): String = {
@@ -66,31 +82,24 @@ class View(val name: String, private[db] val ds: DataSource, freeBlobsEarly: Boo
     else ""
   }
 
+  /**
+    *
+    * @param sql
+    * @return
+    */
   def getRow(sql: Where): Option[Row] = tx {
     val rows = filter(sql)
 
     rows.size match {
       case 0 => None
       case 1 => Some(rows(0))
-      case size => throw new Error(s"Should be 1 or 0, is -> ${size}")
+      case size => DbError(s"Should be 1 or 0, is -> ${size}")
     }
   }
 
-  def getRow(id: Long): Option[Row] = getRow(Where("id = ?", id))
+  def getRow(id: Long): Option[Row] = getRow(where("id = ?", id))
 
-  def flatMap[B](f: Row => View): IndexedSeq[B] = ???
-
-  def map[B](f: Row => B, orderClauses: OrderBy*): IndexedSeq[B] = tx {
-
-    val st = conn.createStatement(); // statement objects can be reused with
-    try {
-      val clause = orderByClausesToString(orderClauses)
-      val rs = st.executeQuery(selectSql + clause) // run the query
-      Rows(rs,freeBlobsEarly).map(f)
-    } finally {
-      st.close()
-    }
-  }
+  def map[B, W <% Where](f: Row => B, where: W = where()): IndexedSeq[B] = filter(where).map(f)
 
   /**
     * Note - You can put ORDER BY into the Where clause ...
@@ -100,13 +109,11 @@ class View(val name: String, private[db] val ds: DataSource, freeBlobsEarly: Boo
     */
   def filter(where: Where): Rows = tx {
 
-    val ps = prepareStatement(s"${selectSql} WHERE ${where.clause}", where.params) // run the query
+    val ps = prepareStatement(s"${selectSql} ${where.sql}", where.params) // run the query
     try {
       val rs = ps.executeQuery
       Rows(rs, freeBlobsEarly)
-    } finally {
-      ps.close
-    }
+    } finally ps.close
   }
 
   def filter(lookup: (String, Any)*): Seq[Row] = filter(tuplesToWhere(lookup: _*))
@@ -144,40 +151,38 @@ class View(val name: String, private[db] val ds: DataSource, freeBlobsEarly: Boo
   def get(id: Long): Option[Row] = getRow(id)
 
   def page(start: Long, pageSize: Int, orderClauses: Seq[OrderBy] = Seq(OrderAsc("id"))): Rows = tx {
-    val st = conn.createStatement(); // statement objects can be reused with
+    val st = conn.createStatement()
     try {
       val orderClausesStr = orderByClausesToString(orderClauses)
       val rs = st.executeQuery(s"${selectSql} $orderClausesStr LIMIT ${start}, ${pageSize}")
       Rows(rs, freeBlobsEarly)
-    } finally {
-      st.close
-    }
+    } finally st.close
   }
+
+  def toPaged(pageSize: Int, filter: (String, Seq[Any]) = ("", Seq()), indexCol: String = "id") =
+    PagedView.apply(this, pageSize, filter, indexCol)
 
   def maxId: Long = max(id)
 
   def max(colName: String): Long = tx {
-    val st = conn.createStatement(); // statement objects can be reused with
+    val st = conn.createStatement() // statement objects can be reused with
     try {
       val rs = st.executeQuery(s"SELECT MAX($colName) AS max_val FROM ${name}")
       if (rs.next) {
         rs.getLong("max_val")
       } else DbError(s"Database did not return max($colName) for table: $name")
-    } finally {
-      st.close
-    }
+    } finally st.close
+
   }
 
 
   def count: Long = tx {
-    val st = conn.createStatement(); // statement objects can be reused with
+    val st = conn.createStatement() // statement objects can be reused with
     try {
       val rs = st.executeQuery(s"SELECT COUNT(*) AS total FROM ${name}")
       if (rs.next) rs.getLong("total")
       else DbError(s"Database did not return count for table: $name")
-    } finally {
-      st.close
-    }
+    } finally st.close
   }
 
 }

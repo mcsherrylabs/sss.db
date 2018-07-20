@@ -50,7 +50,6 @@ class Db(dbConfig: DbConfig) extends Logging with Dynamic with Tx {
 
   private lazy val tables: MMap[String, Table] = new SynchronizedLruMap[String, Table](dbConfig.tableCacheSize)
 
-
   override private[db] def conn: Connection = Tx.get.conn
 
   if(dbConfig.useShutdownHook) sys addShutdownHook shutdown
@@ -92,6 +91,18 @@ class Db(dbConfig: DbConfig) extends Logging with Dynamic with Tx {
 
   def table(name: String): Table =  tables.getOrElseUpdate(name, new Table(name, ds, dbConfig.freeBlobsEarly))
 
+  /*
+  Views - they're great!
+
+  https://stackoverflow.com/questions/3854606/what-are-the-disadvantage-of-sql-views
+  http://www.craigsmullins.com/viewnw.htm
+
+  Note - views can be based on other views.
+  Note - views can be updated with limitations
+  (http://www.informit.com/articles/article.aspx?p=130855&seqNum=4)
+
+  TL;DR for blockchain type applications views are a good solution.
+   */
   def view(name: String): View = new View(name, ds, dbConfig.freeBlobsEarly)
 
   def dropView(viewName: String) = executeSql(s"DROP VIEW ${viewName}")

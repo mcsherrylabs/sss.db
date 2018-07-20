@@ -2,7 +2,11 @@ package sss.db
 
 import java.util.Date
 
-class DbSpec extends DbSpecSetup with DbV2Spec with PagedViewSpec {
+class DbSpec extends
+  DbSpecSetup with
+  DbV2Spec with
+  PagedViewSpec with
+  ForComprehensionSpec {
 
 
   it should " allow insert into existing table " in {

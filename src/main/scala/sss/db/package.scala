@@ -35,7 +35,7 @@ package object db {
       BigDecimal with
       Byte with
       Double with
-      scala.collection.mutable.WrappedArray[Byte] with
+      collection.mutable.WrappedArray[Byte] with
       Array[Byte] with
       java.sql.Date with
       java.sql.Time with
@@ -58,16 +58,52 @@ package object db {
 
   implicit def toMap(r: Row): Map[String, _] = r.asMap
 
+  type Limit = Option[Int]
+
   trait OrderBy
+
+  object OrderBys {
+    def apply(pageSize:Int, orderBys: OrderBy*): OrderBys = OrderBys(orderBys.toSeq, Some(pageSize))
+    def apply(orderBys: OrderBy*): OrderBys = OrderBys(orderBys.toSeq, None)
+  }
+
+  sealed case class OrderBys(orderBys: Seq[OrderBy] = Seq.empty, limit: Limit = None) {
+    def limit(limit: Int): OrderBys = OrderBys(orderBys, Some(limit))
+    private [db] def sql: String = {
+      orderByClausesToString(orderBys) + (limit match {
+        case Some(l) => s" LIMIT $l"
+        case None    => ""
+      })
+    }
+
+    private def orderByClausesToString(orderClauses: Seq[OrderBy]): String = {
+      if(orderClauses.nonEmpty)
+        " ORDER BY " + orderClauses.map {
+          case OrderDesc(col) => s"$col DESC"
+          case OrderAsc(col) => s"$col ASC"
+        }.mkString(",")
+      else ""
+    }
+  }
   sealed case class OrderDesc(colName: String) extends OrderBy
   sealed case class OrderAsc(colName: String) extends OrderBy
 
-  sealed case class Where(clause: String, params: Any*) {
-    def apply(prms: Any*): Where = Where(clause = clause, params = prms: _*)
+  sealed class Where private[db] (val clause: String, val params: Seq[Any] = Seq.empty, val orderBys: OrderBys = OrderBys()) {
+    def apply(prms: Any*): Where = new Where(clause = clause, params = prms)
+    def orderBy(orderBys: OrderBys): Where = new Where(clause, params, orderBys)
+    def orderBy(orderBys: OrderBy*): Where = new Where(clause, params, OrderBys(orderBys, None))
+    def limit(page: Int): Where = new Where(clause, params, orderBys.limit(page))
+    private [db] def sql: String = {
+      val where = if(!clause.isEmpty) s" WHERE $clause" else ""
+      where + orderBys.sql
+    }
   }
 
-  def where(sqlParams: (String, Seq[Any])): Where = Where(sqlParams._1, sqlParams._2: _*)
-  def where(sql: String, params: Any*): Where = Where(sql, params: _*)
+  implicit def toWhere(orderBy: OrderBy): Where = new Where("", Seq.empty, OrderBys(orderBy))
+
+  def where(): Where = new Where("")
+  def where(sqlParams: (String, Seq[Any])): Where = new Where(sqlParams._1, sqlParams._2)
+  def where(sql: String, params: Any*): Where = new Where(sql, params.toSeq)
 
   import scala.reflect.runtime.universe._
 

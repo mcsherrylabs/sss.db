@@ -1,7 +1,5 @@
 package sss.db
 
-import org.scalatest.{FlatSpec, Matchers}
-
 
 /**
   * Created by alan on 6/21/16.
@@ -16,6 +14,7 @@ trait PagedViewSpec {
 
 
   "A paged View" should " be able to handle an empty table " in {
+    view.delete(where("1 = 1"))
     val pv = new PagedView(idCol, view, 2, (s"$statusCol = ? ", Seq(0)))
     var page = pv.last
     assert(!page.hasNext)
@@ -28,6 +27,7 @@ trait PagedViewSpec {
   }
 
   it should " be able to scroll back through 5 pages " in {
+
 
     (1 to 10) foreach { i => view.insert(Map(idCol -> i, statusCol -> 0)) }
 
@@ -48,6 +48,7 @@ trait PagedViewSpec {
 
 
   it should " match expected walk exactly " in {
+
 
     (1 to 10) foreach { i => view.insert(Map(idCol -> i, statusCol -> 0)) }
     val pv = new PagedView(idCol, view, 3, (s"$statusCol = ?", Seq(0)))
@@ -101,6 +102,25 @@ trait PagedViewSpec {
     }
     assert(!ps.last.hasPrev)
     assert(ps.last.hasNext)
+  }
+
+
+  it should " work without a filter " in {
+
+    (1 to 10) foreach { i => view2.insert(Map(idCol -> i, statusCol -> 0)) }
+
+    val pv = PagedView(view2, 2)
+    var page = pv.first
+    assert(page.hasNext)
+    assert(!page.hasPrev)
+    assert(page.rows.size == 2)
+    var p = page
+    (1 until 5) foreach{ n =>
+      p = p.next
+      assert(p.rows.size == 2)
+      println(p.rows.mkString(","))
+    }
+
   }
 
 }

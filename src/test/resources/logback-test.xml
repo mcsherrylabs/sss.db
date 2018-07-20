@@ -27,7 +27,7 @@
         <appender-ref ref="LOGFILE"/>
     </root>
     <logger name="com.zaxxer.hikari">
-        <level value="off"/>
+        <level value="on"/>
     </logger>
     <logger name="sss.db">
         <level value="DEBUG"/>

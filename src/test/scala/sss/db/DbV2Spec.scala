@@ -65,7 +65,7 @@ trait DbV2Spec {
     val time = new Date()
     val r1 = fixture.table.persist(Map(("strId" -> "strId"), ("createTime" -> time), ("intVal" -> 45)))
 
-    val r2 = fixture.table.find(Where("id = ?", r1("id")))
+    val r2 = fixture.table.find(where("id = ?", r1("id")))
     assert(r1 == r2.get)
   }
 
@@ -81,7 +81,7 @@ trait DbV2Spec {
 
     val time = new Date()
     val r1 = fixture.table.persist(Map(("strId" -> "strId"), ("createTime" -> time), ("intVal" -> 45)))
-    val r2 = fixture.table.find(Where("id = ?", r1("id")))
+    val r2 = fixture.table.find(where("id = ?", r1("id")))
     assert(r1 == r2.get)
     val deletedRowCount = fixture.table.delete(where(ps"id = ${r1("id")}"))
     assert(deletedRowCount === 1)
@@ -138,7 +138,7 @@ trait DbV2Spec {
         }
         val view = fixture.dbUnderTest.view("testview2")
         assert(view.count == 50)
-        val empty = view.filter(Where("intVal < 50"))
+        val empty = view.filter(where("intVal < 50"))
         assert(empty.isEmpty)
       }
     } finally fixture.dbUnderTest.dropView("testview2")
@@ -229,7 +229,7 @@ trait DbV2Spec {
     table.persist(Map("blobVal" -> bytes))
 
     table.tx {
-      val found = table.find(Where("blobVal = ?", bytes))
+      val found = table.find(where("blobVal = ?", bytes))
       assert(found.isDefined)
       assert(found.get[Array[Byte]]("blobVal") === bytes)
       assert(new String(found.get[mutable.WrappedArray[Byte]]("blobVal").array) === testStr)
@@ -245,7 +245,7 @@ trait DbV2Spec {
     val m = table.persist(Map("blobVal" -> wAry))
 
     table.tx {
-      val found = table.find(Where("blobVal = ?", wAry.array))
+      val found = table.find(where("blobVal = ?", wAry.array))
       assert(found.isDefined)
       assert(found.get[mutable.WrappedArray[Byte]]("blobVal") === wAry)
       assert(new String(found.get[mutable.WrappedArray[Byte]]("blobVal").array) === testStr)
@@ -261,7 +261,7 @@ trait DbV2Spec {
     table.persist(Map("blobVal" -> bytes))
 
     table.tx {
-      val found = table.find(Where("blobVal = ?", bytes))
+      val found = table.find(where("blobVal = ?", bytes))
       assert(found.isDefined)
       val is = found.get[InputStream]("blobVal")
       val readBytes = new Array[Byte](bytes.length)
@@ -282,7 +282,7 @@ trait DbV2Spec {
     assert(r.isDefined)
     assert(r.get("boolVal") === true)
     assert(r.get[Boolean]("boolVal") === true)
-    val found = table.find(Where("boolVal = ?", true))
+    val found = table.find(where("boolVal = ?", true))
     assert( found.isDefined)
 
   }

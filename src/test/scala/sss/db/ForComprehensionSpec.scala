@@ -1,22 +1,28 @@
 package sss.db
 
-class ForComprehensionSpec extends DbSpecSetup {
+trait ForComprehensionSpec {
 
-  /*it should "" in {
+  self: DbSpec =>
 
-    val time = new Date()
-    fixture.table.insert(0, "strId", time, 42)
+  it should "support the for comprehension style" in {
+
+    (0 until 10) map { x =>
+      fixture.dbUnderTest.table("testForComp").insert(x, x+1, "strId" + x)
+    }
+
     val rows = for {
-      r <- fixture.table
-    } yield(r)
+      rs: Rows <- (fixture.dbUnderTest.table("testForComp").toPaged(1))
+      r        <- rs
 
-    assert(rows.size === 1, "Should only be one row!")
-    val row = rows(0)
+      //r1 <- fixture.dbUnderTest.table("testForComp")
+      //if r1[Long](idCol) == r2[Long](idCol)
+      //if (r[Long](idCol) == 0)
 
-    assert(row[String]("strId") == "strId")
-    assert(row("createTime") === time.getTime)
-    assert(row("intVal") === 42)
+    } yield((r, rs))
 
-  }*/
+
+    assert(rows.size === 10, "Should only be one row!")
+
+  }
 
 }

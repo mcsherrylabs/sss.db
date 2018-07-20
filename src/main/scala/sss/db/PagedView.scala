@@ -1,4 +1,5 @@
 package sss.db
+
 /**
   * Created by alan on 6/21/16.
   */
@@ -31,11 +32,14 @@ case class PageImpl(indexCol: String, view: View, rows: Rows, pageSize: Int, fil
     else throw new IllegalAccessException("No next page")
 
   private lazy val nextRows = view.filter(
-    where (s"$indexCol > ? ${filterClause} ORDER BY $indexCol ASC LIMIT $pageSize"
-      , (lastIndexInPage +: filter._2):_*))
+    where (s"$indexCol > ? ${filterClause}", (lastIndexInPage +: filter._2):_*)
+      orderBy OrderAsc(indexCol)
+      limit pageSize)
 
   private lazy val prevRows = view.filter(
-    where (s"$indexCol < ? ${filterClause} ORDER BY $indexCol DESC LIMIT $pageSize", (firstIndexInPage +: filter._2):_*))
+    where (s"$indexCol < ? ${filterClause}", (firstIndexInPage +: filter._2):_*)
+      orderBy OrderDesc(indexCol)
+      limit pageSize)
 
 
   lazy override val prev: Page = {
@@ -61,6 +65,16 @@ object PagedView {
   def apply(view:View, pageSize: Int, filter: (String, Seq[Any]) = ("", Seq()), indexCol: String = "id") = {
     new PagedView(indexCol, view, pageSize, filter)
   }
+
+  implicit def asStream(pagedView: PagedView): Stream[Rows] = {
+    def stream(p:Page): Stream[Rows] = {
+      if(p.rows.isEmpty) Stream.empty[Rows]
+      else if(p.hasNext) p.rows #:: stream(p.next)
+      else p.rows #:: Stream.empty[Rows]
+    }
+    stream(pagedView.first)
+  }
+
 }
 
 class PagedView(indexCol: String, view:View,
@@ -74,13 +88,21 @@ class PagedView(indexCol: String, view:View,
 
   def last: Page = {
 
-    val rows = view.filter(where (s"${filter._1} ORDER BY $indexCol DESC LIMIT $pageSize", filter._2: _*))
+    val rows = view.filter(
+      where ((s"${filter._1}"), filter._2: _*)
+        orderBy(OrderDesc(indexCol))
+        limit(pageSize))
+
     if(rows.isEmpty) EmptyPage(this)
     else PageImpl(indexCol, view, rows.reverse, pageSize, filter)
   }
 
   def first: Page = {
-    val rows = view.filter(where (s"${filter._1} ORDER BY $indexCol ASC LIMIT $pageSize", filter._2: _*))
+    val rows = view.filter(
+      where (s"${filter._1}", filter._2: _*)
+        orderBy(OrderAsc(indexCol))
+        limit(pageSize))
+
     if(rows.isEmpty) EmptyPage(this)
     else PageImpl(indexCol, view, rows, pageSize, filter)
   }
