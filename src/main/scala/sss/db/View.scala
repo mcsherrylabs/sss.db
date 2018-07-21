@@ -9,6 +9,7 @@ import sss.ancillary.Logging
 
 import scala.collection.mutable
 import scala.reflect.runtime.universe._
+import scala.language.implicitConversions
 
 /**
   *
@@ -101,6 +102,8 @@ class View(val name: String,
 
   def map[B, W <% Where](f: Row => B, where: W = where()): IndexedSeq[B] = filter(where).map(f)
 
+  def foreach[W <% Where](f: Row => Unit, where: W = where()): Unit = map(f, where)
+
   /**
     * Note - You can put ORDER BY into the Where clause ...
     *
@@ -159,8 +162,10 @@ class View(val name: String,
     } finally st.close
   }
 
-  def toPaged(pageSize: Int, filter: (String, Seq[Any]) = ("", Seq()), indexCol: String = "id") =
-    PagedView.apply(this, pageSize, filter, indexCol)
+  def toPaged(pageSize: Int,
+              filter: (String, Seq[Any]) = ("", Seq()),
+              indexCol: String = "id") =
+    PagedView(this, pageSize, filter, indexCol)
 
   def maxId: Long = max(id)
 

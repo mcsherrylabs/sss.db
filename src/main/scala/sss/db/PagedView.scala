@@ -66,13 +66,17 @@ object PagedView {
     new PagedView(indexCol, view, pageSize, filter)
   }
 
-  implicit def asStream(pagedView: PagedView): Stream[Rows] = {
-    def stream(p:Page): Stream[Rows] = {
-      if(p.rows.isEmpty) Stream.empty[Rows]
-      else if(p.hasNext) p.rows #:: stream(p.next)
-      else p.rows #:: Stream.empty[Rows]
+  implicit class toStream(val pagedView: PagedView) extends AnyVal {
+
+    def toStream: Stream[Rows] = {
+      def stream(p: Page): Stream[Rows] = {
+        if (p.rows.isEmpty) Stream.empty[Rows]
+        else if (p.hasNext) p.rows #:: stream(p.next)
+        else p.rows #:: Stream.empty[Rows]
+      }
+
+      stream(pagedView.first)
     }
-    stream(pagedView.first)
   }
 
 }

@@ -1,12 +1,13 @@
 package sss.db
 
+import org.scalatest.DoNotDiscover
+
 
 /**
   * Created by alan on 6/21/16.
   */
-trait PagedViewSpec {
-
-  self: DbSpec =>
+@DoNotDiscover
+class PagedViewSpec extends DbSpecSetup {
 
   def view = fixture.dbUnderTest.table(testPaged)
 

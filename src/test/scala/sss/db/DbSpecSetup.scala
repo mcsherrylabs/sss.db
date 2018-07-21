@@ -2,10 +2,13 @@ package sss.db
 
 import org.scalatest._
 
-trait DbSpecSetup extends FlatSpec with Matchers with BeforeAndAfter  {
+trait DbSpecSetupBase extends Matchers with BeforeAndAfter {
+
+  self: Suite =>
 
   case class TestFixture(dbUnderTest: Db, table: Table)
 
+  val dbConfigName = "testDb"
   var fixture: TestFixture = _
 
   val idCol = "id"
@@ -14,7 +17,7 @@ trait DbSpecSetup extends FlatSpec with Matchers with BeforeAndAfter  {
   val testPaged2 = "testPaged2"
 
   before {
-    val dbUnderTest = Db("testDb")
+    val dbUnderTest = Db(dbConfigName)
     fixture = TestFixture(dbUnderTest, dbUnderTest.table("test"))
   }
 
@@ -23,3 +26,7 @@ trait DbSpecSetup extends FlatSpec with Matchers with BeforeAndAfter  {
   }
 
 }
+
+trait DbSpecSetup extends FlatSpec with DbSpecSetupBase
+trait AsyncDbSpecSetup extends AsyncFlatSpec with DbSpecSetupBase
+

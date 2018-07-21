@@ -1,27 +1,22 @@
 package sss.db
 
-trait ForComprehensionSpec {
+import org.scalatest.DoNotDiscover
 
-  self: DbSpec =>
+@DoNotDiscover
+class ForComprehensionSpec extends DbSpecSetup {
 
-  it should "support the for comprehension style" in {
 
-    (0 until 10) map { x =>
-      fixture.dbUnderTest.table("testForComp").insert(x, x+1, "strId" + x)
-    }
+  "A paged view " should "support the for comprehension style" in {
 
     val rows = for {
-      rs: Rows <- (fixture.dbUnderTest.table("testForComp").toPaged(1))
+      x <- (0 until 10)
+      _ = fixture.dbUnderTest.table("testForComp").insert(x, x+1, "strId" + x)
+      //rs: Rows <- (fixture.dbUnderTest.table("testForComp").toPaged(15))
+      rs: Rows <- (fixture.dbUnderTest.table("testForComp").toPaged(2)).toStream
       r        <- rs
+    } yield(r)
 
-      //r1 <- fixture.dbUnderTest.table("testForComp")
-      //if r1[Long](idCol) == r2[Long](idCol)
-      //if (r[Long](idCol) == 0)
-
-    } yield((r, rs))
-
-
-    assert(rows.size === 10, "Should only be one row!")
+    assert(rows.size === 100, "Should be 100 rows!")
 
   }
 

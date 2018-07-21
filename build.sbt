@@ -7,6 +7,8 @@ scalaVersion := "2.12.6"
 
 updateOptions := updateOptions.value.withGigahorse(false)
 
+parallelExecution in Test := false
+
 resolvers += "stepsoft" at "http://nexus.mcsherrylabs.com/repository/releases/"
 
 dependencyOverrides += "org.scala-lang" % "scala-compiler" % scalaVersion.value

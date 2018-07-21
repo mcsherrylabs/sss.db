@@ -3,12 +3,12 @@ package sss.db
 import java.io.{DataInputStream, InputStream}
 import java.util.Date
 
+import org.scalatest.DoNotDiscover
+
 import scala.collection.mutable
-import scala.util.control.NonFatal
 
-trait DbV2Spec {
-
-  self: DbSpec =>
+@DoNotDiscover
+class DbV2Spec extends DbSpecSetup {
 
   "A Db " should " allow persist(update) using a map " in {
     val time = new Date()
@@ -173,14 +173,7 @@ trait DbV2Spec {
       // now return 'stale' row
       m
     }
-
-    try {
-      table.persist(m)
-      fail("Should have got an optimistic locking ex")
-    } catch {
-      case e: DbOptimisticLockingException =>
-      case NonFatal(x) => fail("Should have got an optimistic locking ex")
-    }
+    intercept[DbOptimisticLockingException](table.persist(m))
   }
 
   it should " support persisting a byte as Binary" in {
