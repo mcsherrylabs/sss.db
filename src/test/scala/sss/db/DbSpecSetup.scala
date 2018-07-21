@@ -17,7 +17,7 @@ trait DbSpecSetupBase extends Matchers with BeforeAndAfter {
   val testPaged2 = "testPaged2"
 
   before {
-    val dbUnderTest = Db(dbConfigName)
+    val dbUnderTest = Db(dbConfigName)(Db.defaultDataSource(dbConfigName))
     fixture = TestFixture(dbUnderTest, dbUnderTest.table("test"))
   }
 

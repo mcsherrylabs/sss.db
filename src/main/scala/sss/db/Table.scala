@@ -10,7 +10,7 @@ import scala.util.control.NonFatal
 trait Tx extends Logging {
 
   private[db] val ds: DataSource
-  private[db] def conn: Connection
+  private[db] def conn: Connection = Tx.get.conn
 
   def startTx: Boolean = {
     Option(Tx.get()) match {

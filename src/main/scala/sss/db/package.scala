@@ -14,7 +14,6 @@ import scala.language.implicitConversions
  */
 package object db {
 
-
   object DbException { def apply(msg: String) = throw new DbException(msg) }
   object DbError { def apply(msg: String) = throw new DbError(msg) }
 

@@ -16,7 +16,7 @@ trait Page {
   def tx[T](f: => T)
 }
 
-case class PageImpl(indexCol: String, view: View, rows: Rows, pageSize: Int, filter: (String, Seq[Any])) extends Page {
+case class PageImpl(indexCol: String, view: Query, rows: Rows, pageSize: Int, filter: (String, Seq[Any])) extends Page {
 
   require(!rows.isEmpty, "The EmptyPage handles no row situations.")
 
@@ -62,7 +62,7 @@ case class EmptyPage(pagedView: PagedView) extends Page {
 }
 
 object PagedView {
-  def apply(view:View, pageSize: Int, filter: (String, Seq[Any]) = ("", Seq()), indexCol: String = "id") = {
+  def apply(view:Query, pageSize: Int, filter: (String, Seq[Any]) = ("", Seq()), indexCol: String = "id") = {
     new PagedView(indexCol, view, pageSize, filter)
   }
 
@@ -81,7 +81,7 @@ object PagedView {
 
 }
 
-class PagedView(indexCol: String, view:View,
+class PagedView(indexCol: String, view:Query,
                pageSize: Int, filter: (String, Seq[Any])) {
 
   /**
