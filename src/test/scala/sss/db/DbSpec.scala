@@ -10,6 +10,7 @@ class DbSpec extends
     new PagedViewSpec,
     new ForComprehensionSpec,
     new SqlInterpolatorSpec,
+    new ParallelThreadSupportSpec
   ) with
   BeforeAndAfterAll with
   SequentialNestedSuiteExecution {

@@ -1,10 +1,8 @@
 package sss
 
-import java.io.InputStream
+import java.io.{ByteArrayInputStream, InputStream}
 import java.math.BigDecimal
 import java.sql.Blob
-
-import com.sun.xml.internal.messaging.saaj.util.ByteInputStream
 
 import scala.collection.mutable
 import scala.collection.mutable.WrappedArray
@@ -103,6 +101,12 @@ package object db {
   def where(): Where = new Where("")
   def where(sqlParams: (String, Seq[Any])): Where = new Where(sqlParams._1, sqlParams._2)
   def where(sql: String, params: Any*): Where = new Where(sql, params.toSeq)
+  def where(tuples: (String, Any)*): Where = where (
+    tuples.foldLeft[(String, Seq[Any])](("", Seq()))((acc, e) =>
+      if (acc._1.isEmpty) (s"${e._1} = ?", acc._2 :+ e._2)
+      else (s"${acc._1}  AND ${e._1} = ?", acc._2 :+ e._2)
+      )
+  )
 
   import scala.reflect.runtime.universe._
 
@@ -136,7 +140,7 @@ package object db {
         aryByte(0)
       } else if (typeOf[T] == typeOf[InputStream] && rawVal.isInstanceOf[Array[Byte]]) {
         val aryByte = rawVal.asInstanceOf[Array[Byte]]
-        new ByteInputStream(aryByte, aryByte.length)
+        new ByteArrayInputStream(aryByte)
       } else if (typeOf[T] == typeOf[Option[_]])
         Some(rawVal)
       else rawVal

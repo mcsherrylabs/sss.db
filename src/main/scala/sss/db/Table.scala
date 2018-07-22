@@ -64,7 +64,7 @@ private[db] case class ConnectionTracker(conn: Connection, count: Int)
 
 private[db] object Tx extends ThreadLocal[ConnectionTracker]
 
-class Table( name: String,
+class Table private[db] ( name: String,
              ds: DataSource,
              freeBlobsEarly: Boolean,
              columns: String = "*")

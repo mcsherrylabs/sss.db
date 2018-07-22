@@ -16,13 +16,12 @@ import scala.language.implicitConversions
   * can recover from is not by (my) definition an Exception!
   *
   */
-class View(val name: String,
+class View private[db] (val name: String,
            ds: DataSource,
            freeBlobsEarly: Boolean,
            columns: String = "*")
   extends Query(s"SELECT ${columns} from ${name}", ds, freeBlobsEarly)  with Logging {
 
-  //private val selectSql = s"SELECT ${columns} from ${name}"
 
   def maxId: Long = max(id)
 

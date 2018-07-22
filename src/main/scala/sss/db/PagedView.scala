@@ -16,7 +16,7 @@ trait Page {
   def tx[T](f: => T)
 }
 
-case class PageImpl(indexCol: String, view: Query, rows: Rows, pageSize: Int, filter: (String, Seq[Any])) extends Page {
+case class PageImpl private (indexCol: String, view: Query, rows: Rows, pageSize: Int, filter: (String, Seq[Any])) extends Page {
 
   require(!rows.isEmpty, "The EmptyPage handles no row situations.")
 
@@ -31,6 +31,15 @@ case class PageImpl(indexCol: String, view: Query, rows: Rows, pageSize: Int, fi
     if(hasNext) PageImpl(indexCol, view, nextRows, pageSize, filter)
     else throw new IllegalAccessException("No next page")
 
+  lazy override val prev: Page = {
+    if(hasPrev) PageImpl(indexCol, view, prevRows.reverse, pageSize, filter)
+    else throw new IllegalAccessException("No previous page")
+  }
+
+  lazy override val hasPrev: Boolean = !prevRows.isEmpty
+
+  lazy override val hasNext: Boolean = !nextRows.isEmpty
+
   private lazy val nextRows = view.filter(
     where (s"$indexCol > ? ${filterClause}", (lastIndexInPage +: filter._2):_*)
       orderBy OrderAsc(indexCol)
@@ -41,15 +50,6 @@ case class PageImpl(indexCol: String, view: Query, rows: Rows, pageSize: Int, fi
       orderBy OrderDesc(indexCol)
       limit pageSize)
 
-
-  lazy override val prev: Page = {
-    if(hasPrev) PageImpl(indexCol, view, prevRows.reverse, pageSize, filter)
-    else throw new IllegalAccessException("No previous page")
-  }
-
-  lazy override val hasPrev: Boolean = !prevRows.isEmpty
-
-  lazy override val hasNext: Boolean = !nextRows.isEmpty
 }
 
 case class EmptyPage(pagedView: PagedView) extends Page {
@@ -66,7 +66,31 @@ object PagedView {
     new PagedView(indexCol, view, pageSize, filter)
   }
 
-  implicit class toStream(val pagedView: PagedView) extends AnyVal {
+  /**
+    * NOT thread safe.
+    * 'hasNext' must be checked before calling 'next' to avoid IllegalAccessException
+    *
+    * @param pagedView
+    * @return
+    */
+  implicit class ToIterator(val pagedView: PagedView) extends AnyVal {
+
+    def toIterator: Iterator[Rows] = new Iterator[Rows] {
+      var currentPage = pagedView.first
+
+      override def next(): Rows = {
+        val cached = currentPage.rows
+        currentPage = currentPage.next
+        cached
+      }
+
+      override def hasNext: Boolean = currentPage.hasNext
+    }
+  }
+
+
+
+  implicit class ToStream(val pagedView: PagedView) extends AnyVal {
 
     def toStream: Stream[Rows] = {
       def stream(p: Page): Stream[Rows] = {
@@ -93,9 +117,9 @@ class PagedView(indexCol: String, view:Query,
   def last: Page = {
 
     val rows = view.filter(
-      where ((s"${filter._1}"), filter._2: _*)
-        orderBy(OrderDesc(indexCol))
-        limit(pageSize))
+      where (filter)
+        orderBy OrderDesc(indexCol)
+        limit pageSize)
 
     if(rows.isEmpty) EmptyPage(this)
     else PageImpl(indexCol, view, rows.reverse, pageSize, filter)
@@ -103,9 +127,9 @@ class PagedView(indexCol: String, view:Query,
 
   def first: Page = {
     val rows = view.filter(
-      where (s"${filter._1}", filter._2: _*)
-        orderBy(OrderAsc(indexCol))
-        limit(pageSize))
+      where (filter)
+        orderBy OrderAsc(indexCol)
+        limit pageSize)
 
     if(rows.isEmpty) EmptyPage(this)
     else PageImpl(indexCol, view, rows, pageSize, filter)

@@ -1,7 +1,7 @@
-package sss.db
+package sss.db.datasource
 
 import com.zaxxer.hikari.{HikariConfig, HikariDataSource => HikariDS}
-import sss.db.Db.CloseableDataSource
+import sss.db.datasource.DataSource.CloseableDataSource
 
 /**
   * The default and recommended data source.

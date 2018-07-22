@@ -2,12 +2,14 @@ package sss.db
 
 import java.util.Date
 
+import org.scalatest.DoNotDiscover
+
 import concurrent.{Await, Future}
 import concurrent.duration._
 import language.postfixOps
 import concurrent.ExecutionContext.Implicits.global
 
-//@DoNotDiscover
+@DoNotDiscover
 class ParallelThreadSupportSpec extends DbSpecSetup {
 
   def parallelEffect(j: Int):Future[Boolean] = Future {

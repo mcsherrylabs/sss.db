@@ -22,7 +22,7 @@ import scala.reflect.runtime.universe._
   * can recover from is not by (my) definition an Exception!
   *
   */
-class Query(private val selectSql: String,
+class Query private[db] (private val selectSql: String,
             private[db] val ds: DataSource,
             freeBlobsEarly: Boolean)
   extends Tx
@@ -30,8 +30,6 @@ class Query(private val selectSql: String,
 
   protected val id = "id"
   protected val version = "version"
-
-  //private[db] def conn: Connection = Tx.get.conn
 
   private[db] def mapToSql(value: Any): Any = {
     value match {
@@ -98,6 +96,9 @@ class Query(private val selectSql: String,
   def getRow(id: Long): Option[Row] = getRow(where("id = ?", id))
 
   def map[B, W <% Where](f: Row => B, where: W = where()): IndexedSeq[B] = filter(where).map(f)
+
+  def flatMap[Q, W <% Where](f: Row => Q, where: W = where()): IndexedSeq[Q] = filter(where).map(f)
+  def withFilter(f: Row => Boolean): Rows = filter(where()).filter(f)
 
   def foreach[W <% Where](f: Row => Unit, where: W = where()): Unit = map(f, where)
 

@@ -7,7 +7,7 @@ import org.scalatest.DoNotDiscover
 @DoNotDiscover
 class DbV1Spec extends DbSpecSetup {
 
-  it should " allow insert into existing table " in {
+  "A Db" should " allow insert into existing table " in {
 
     val numInserted = fixture.table.insert(0, "strId", new Date().getTime, 42)
     assert(numInserted == 1, s"Should be 1 row created not ${numInserted}!")

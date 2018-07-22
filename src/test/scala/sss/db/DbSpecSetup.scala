@@ -1,6 +1,7 @@
 package sss.db
 
 import org.scalatest._
+import sss.db.datasource.DataSource
 
 trait DbSpecSetupBase extends Matchers with BeforeAndAfter {
 
@@ -17,7 +18,7 @@ trait DbSpecSetupBase extends Matchers with BeforeAndAfter {
   val testPaged2 = "testPaged2"
 
   before {
-    val dbUnderTest = Db(dbConfigName)(Db.defaultDataSource(dbConfigName))
+    val dbUnderTest = Db(dbConfigName, DataSource(s"$dbConfigName.datasource"))
     fixture = TestFixture(dbUnderTest, dbUnderTest.table("test"))
   }
 

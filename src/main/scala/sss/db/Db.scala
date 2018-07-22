@@ -2,19 +2,13 @@ package sss.db
 
 import com.twitter.util.SynchronizedLruMap
 import com.typesafe.config.Config
-import javax.sql.DataSource
 import sss.ancillary.{DynConfig, Logging}
-import sss.db.Db.CloseableDataSource
+import sss.db.datasource.DataSource
+import sss.db.datasource.DataSource._
 
 import scala.language.dynamics
 
 object Db {
-
-  type CloseableDataSource = DataSource with AutoCloseable
-
-  def defaultDataSource(dsConfig: DataSourceConfig) :CloseableDataSource = HikariDataSource(dsConfig)
-  def defaultDataSource(dbConfigName: String = "database") : CloseableDataSource =
-    defaultDataSource(DynConfig[DataSourceConfig](dbConfigName))
 
   def apply(dbConfig: DbConfig)(ds:CloseableDataSource) = {
     new Db(dbConfig)(ds)
@@ -24,23 +18,9 @@ object Db {
     apply(DynConfig[DbConfig](dbConfig))(ds)
   }
 
-  def apply(dbConfigName: String = "database")(ds:CloseableDataSource = defaultDataSource()): Db = {
+  def apply(dbConfigName: String = "database", ds:CloseableDataSource = DataSource()): Db = {
     apply(DynConfig[DbConfig](dbConfigName))(ds)
   }
-}
-
-trait DataSourceConfig {
-  val testQueryOpt: Option[String]
-  val maxPoolSize: Int
-  val cachePrepStmts : Boolean
-  val prepStmtCacheSize: Int
-  val prepStmtCacheSqlLimit: Int
-  val useServerPrepStmts: Boolean
-  val driver: String
-  val connection: String
-  val connectionProperties: String
-  val user: String
-  val pass: String
 }
 
 trait DbConfig {

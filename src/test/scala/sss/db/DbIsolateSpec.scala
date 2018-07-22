@@ -2,6 +2,7 @@ package sss.db
 
 class DbIsolateSpec extends DbSpecSetup {
 
+
   /*it should " be able to delete a row " in {
 
     val time = new Date()
