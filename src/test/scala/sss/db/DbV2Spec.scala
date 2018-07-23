@@ -184,7 +184,7 @@ class DbV2Spec extends DbSpecSetup {
       val m = table.persist(Map("byteVal" -> testByte))
       assert(m[Byte]("byteVal") === testByte)
       val empty = table.persist(Map("byteVal" -> None))
-      assert(empty[Byte]("byteVal") === null)
+      assert(Option(empty[Byte]("byteVal")).isEmpty)
       assert(empty[Option[Byte]]("byteVal") === None)
     }
 

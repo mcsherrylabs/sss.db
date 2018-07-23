@@ -1,5 +1,7 @@
 package sss.db
 
+import sss.db.PagedView.ToIterator
+
 /**
   * Created by alan on 6/21/16.
   */
@@ -54,8 +56,8 @@ case class PageImpl private (indexCol: String, view: Query, rows: Rows, pageSize
 
 case class EmptyPage(pagedView: PagedView) extends Page {
   override val rows: Rows = IndexedSeq()
-  lazy override val next: Page = pagedView.last
-  lazy override val prev: Page = pagedView.first
+  lazy override val next: Page = pagedView.lastPage
+  lazy override val prev: Page = pagedView.firstPage
   override val hasPrev: Boolean = false
   override val hasNext: Boolean = false
   def tx[T](f: => T) = pagedView.tx(f)
@@ -63,32 +65,17 @@ case class EmptyPage(pagedView: PagedView) extends Page {
 
 object PagedView {
   def apply(view:Query, pageSize: Int, filter: (String, Seq[Any]) = ("", Seq()), indexCol: String = "id") = {
-    new PagedView(indexCol, view, pageSize, filter)
+    new PagedView(view, pageSize, filter, indexCol)
   }
 
   /**
-    * NOT thread safe.
-    * 'hasNext' must be checked before calling 'next' to avoid IllegalAccessException
     *
     * @param pagedView
     * @return
     */
   implicit class ToIterator(val pagedView: PagedView) extends AnyVal {
-
-    def toIterator: Iterator[Rows] = new Iterator[Rows] {
-      var currentPage = pagedView.first
-
-      override def next(): Rows = {
-        val cached = currentPage.rows
-        currentPage = currentPage.next
-        cached
-      }
-
-      override def hasNext: Boolean = currentPage.hasNext
-    }
+    def toIterator: Iterator[Rows] = ToStream(pagedView).toStream.iterator
   }
-
-
 
   implicit class ToStream(val pagedView: PagedView) extends AnyVal {
 
@@ -100,14 +87,16 @@ object PagedView {
         else p.rows #:: Stream.empty[Rows]
       }
 
-      stream(pagedView.first)
+      stream(pagedView.firstPage)
     }
   }
 
 }
 
-class PagedView(indexCol: String, view:Query,
-               pageSize: Int, filter: (String, Seq[Any])) {
+class PagedView private ( view:Query,
+                          pageSize: Int,
+                          filter: (String, Seq[Any]),
+                          indexCol: String) extends Iterable[Rows] {
 
   /**
     * An enclosing tx may be necessary if the rows contain Blobs, and early blob freeing is not
@@ -115,7 +104,9 @@ class PagedView(indexCol: String, view:Query,
     */
   def tx[T](f: => T) = view.tx[T](f)
 
-  def last: Page = {
+  override def iterator: Iterator[Rows] = new ToIterator(this).toIterator
+
+  def lastPage: Page = {
 
     val rows = view.filter(
       where (filter)
@@ -126,7 +117,7 @@ class PagedView(indexCol: String, view:Query,
     else PageImpl(indexCol, view, rows.reverse, pageSize, filter)
   }
 
-  def first: Page = {
+  def firstPage: Page = {
     val rows = view.filter(
       where (filter)
         orderBy OrderAsc(indexCol)
