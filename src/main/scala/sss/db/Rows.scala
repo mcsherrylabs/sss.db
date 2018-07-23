@@ -17,11 +17,11 @@ object Rows {
       val colmax = meta.getColumnCount
 
       @tailrec
-      def parse(rows: Rows, rs: ResultSet): Rows = {
+      def parse(rows: List[Row], rs: ResultSet): Rows = {
         if (rs.next) {
           var r = Map[String, Any]()
           for (i <- 0 until colmax) {
-            val o = rs.getObject(i + 1); // Is SQL the first column is indexed
+            val o = rs.getObject(i + 1); // In SQL the first column is indexed
             if(freeBlobsEarly && o.isInstanceOf[Blob]) {
               val jDBCBlobClient = o.asInstanceOf[Blob]
               try {
@@ -32,11 +32,11 @@ object Rows {
               r = r + (meta.getColumnName(i + 1).toLowerCase -> o)
             }
           }
-          parse(rows :+ (r: Row), rs)
-        } else rows
+          parse((r: Row) +: rows, rs)
+        } else rows.reverse.toIndexedSeq
       }
 
-      parse(IndexedSeq[Row](), rs)
+      parse(List[Row](), rs)
     } finally rs.close
 
   }

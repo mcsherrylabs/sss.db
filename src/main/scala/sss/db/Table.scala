@@ -10,7 +10,7 @@ import scala.util.control.NonFatal
 trait Tx extends Logging {
 
   private[db] val ds: DataSource
-  private[db] def conn: Connection
+  private[db] def conn: Connection = Tx.get.conn
 
   def startTx: Boolean = {
     Option(Tx.get()) match {
@@ -64,7 +64,16 @@ private[db] case class ConnectionTracker(conn: Connection, count: Int)
 
 private[db] object Tx extends ThreadLocal[ConnectionTracker]
 
-class Table(name: String, ds: DataSource, freeBlobsEarly: Boolean) extends View(name, ds, freeBlobsEarly) {
+class Table private[db] ( name: String,
+             ds: DataSource,
+             freeBlobsEarly: Boolean,
+             columns: String = "*")
+
+  extends View(
+    name,
+    ds,
+    freeBlobsEarly,
+    columns) {
 
   @throws[DbOptimisticLockingException]("if the row has been updated after you read it")
   def update(values: Map[String, Any]): Row = inTransaction {
@@ -145,15 +154,15 @@ class Table(name: String, ds: DataSource, freeBlobsEarly: Boolean) extends View(
   def persist(values: Map[String, Any]): Row = inTransaction {
 
     values.partition(kv => id.equalsIgnoreCase(kv._1)) match {
-      case (mapWithId, rest) if(mapWithId.isEmpty) => insert(rest)
+      case (mapWithId, rest) if(mapWithId.isEmpty)       => insert(rest)
       case (mapWithId, rest) if(mapWithId.head._2 == 0l) => insert(rest)
-      case _ =>  update(values)
+      case _                                             => update(values)
     }
   }
 
   def delete(where: Where): Int = tx[Int] {
 
-    val ps = prepareStatement(s"DELETE FROM ${name} WHERE ${where.expand}", where.params)
+    val ps = prepareStatement(s"DELETE FROM ${name} WHERE ${where.clause}", where.params)
     try {
       ps.executeUpdate(); // run the query
     } finally {

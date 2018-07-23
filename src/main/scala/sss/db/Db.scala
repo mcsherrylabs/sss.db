@@ -1,102 +1,68 @@
 package sss.db
 
-import java.sql.{Connection, SQLException}
-
 import com.twitter.util.SynchronizedLruMap
 import com.typesafe.config.Config
-import com.zaxxer.hikari.{HikariConfig, HikariDataSource}
 import sss.ancillary.{DynConfig, Logging}
+import sss.db.datasource.DataSource
+import sss.db.datasource.DataSource._
 
-import scala.collection.JavaConversions._
-import scala.collection.mutable.{Map => MMap}
 import scala.language.dynamics
 
 object Db {
 
-  def apply(dbConfig: DbConfig) = {
-    new Db(dbConfig)
+  def apply(dbConfig: DbConfig)(ds:CloseableDataSource) = {
+    new Db(dbConfig)(ds)
   }
 
-  def apply(dbConfig: Config): Db = {
-    apply(DynConfig[DbConfig](dbConfig))
+  def apply(dbConfig: Config)(ds:CloseableDataSource): Db = {
+    apply(DynConfig[DbConfig](dbConfig))(ds)
   }
 
-  def apply(dbConfigName: String = "database"): Db = {
-    apply(DynConfig[DbConfig](dbConfigName))
+  def apply(dbConfigName: String = "database", ds:CloseableDataSource = DataSource()): Db = {
+    apply(DynConfig[DbConfig](dbConfigName))(ds)
   }
 }
 
 trait DbConfig {
-  val testQueryOpt: Option[String]
-  val maxPoolSize: Int
   val freeBlobsEarly: Boolean
-  val cachePrepStmts : Boolean
-  val prepStmtCacheSize: Int
-  val prepStmtCacheSqlLimit: Int
-  val useServerPrepStmts: Boolean
-  val driver: String
-  val connection: String
-  val connectionProperties: String
-  val user: String
-  val pass: String
   val useShutdownHook: Boolean
-  val tableCacheSize: Int
+  val viewCachesSize: Int
   val deleteSqlOpt: Option[java.lang.Iterable[String]]
   val createSqlOpt: Option[java.lang.Iterable[String]]
-
 }
 
-class Db(dbConfig: DbConfig) extends Logging with Dynamic with Tx {
+class Db(dbConfig: DbConfig)(private[db] val ds:CloseableDataSource) extends Logging with Dynamic with Tx {
 
-  private lazy val tables: MMap[String, Table] = new SynchronizedLruMap[String, Table](dbConfig.tableCacheSize)
-
-
-  override private[db] def conn: Connection = Tx.get.conn
+  private lazy val viewCache  = new SynchronizedLruMap[String, View](dbConfig.viewCachesSize)
+  private lazy val tableCache = new SynchronizedLruMap[String, Table](dbConfig.viewCachesSize)
 
   if(dbConfig.useShutdownHook) sys addShutdownHook shutdown
 
-  private[db] val ds = setUpDataSource(dbConfig)
-
-  {
-
-    dbConfig.deleteSqlOpt foreach { deleteSqlAry =>
-
-      deleteSqlAry.foreach { deleteSql =>
-        if (deleteSql.length > 0) {
-          try {
-            val deleted = executeSql(deleteSql)
-            log.info(s"${deleteSql} Deleted count ${deleted}")
-          } catch {
-            case e: SQLException => log.warn(s"${deleteSql} failed, maybe object doesn't exist?!", e)
-          }
-        }
-      }
-
-    }
-    dbConfig.createSqlOpt foreach { createSqlAry =>
-      createSqlAry foreach { createSql =>
-        if (createSql.length > 0) {
-          try {
-            val created = executeSql(createSql)
-            log.info(s"${createSql} Created count ${created}")
-          } catch {
-            case e: SQLException => log.warn(s"Failed to create ${createSql}")
-          }
-        }
-      }
-    }
-
-  }
+  DbInitialSqlExecutor(dbConfig: DbConfig, executeSql _)
 
   def selectDynamic(tableName: String) = table(tableName)
 
-  def table(name: String): Table =  tables.getOrElseUpdate(name, new Table(name, ds, dbConfig.freeBlobsEarly))
+  def table(name: String): Table =  tableCache.getOrElseUpdate(name, new Table(name, ds, dbConfig.freeBlobsEarly))
 
-  def view(name: String): View = new View(name, ds, dbConfig.freeBlobsEarly)
+  /*
+  Views - they're great!
+
+  https://stackoverflow.com/questions/3854606/what-are-the-disadvantage-of-sql-views
+  http://www.craigsmullins.com/viewnw.htm
+
+  Note - views can be based on other views.
+  Note - views can be updated with limitations
+  (http://www.informit.com/articles/article.aspx?p=130855&seqNum=4)
+
+  TL;DR for blockchain type applications views are a good solution.
+   */
+  def view(name: String): View = viewCache.getOrElseUpdate(name, new View(name, ds, dbConfig.freeBlobsEarly))
 
   def dropView(viewName: String) = executeSql(s"DROP VIEW ${viewName}")
 
   def createView(createViewSql: String) = executeSql(createViewSql)
+
+  def select(sql: String): Query = new Query(sql, ds, dbConfig.freeBlobsEarly)
 
   def shutdown = {
     executeSql("SHUTDOWN")
@@ -124,37 +90,6 @@ class Db(dbConfig: DbConfig) extends Logging with Dynamic with Tx {
     try {
       st.executeUpdate(sql)
     } finally st.close
-  }
-
-  private def setUpDataSource(dbConfig: DbConfig) = {
-
-    val hikariConfig = new HikariConfig()
-    hikariConfig.setDriverClassName(dbConfig.driver)
-    val connPlusProps = {
-      if(!dbConfig.connectionProperties.startsWith(";") && dbConfig.connectionProperties.length > 0) {
-        dbConfig.connection + ";" + dbConfig.connectionProperties
-
-      } else dbConfig.connection + dbConfig.connectionProperties
-    }
-    hikariConfig.setJdbcUrl(connPlusProps)
-
-    hikariConfig.setUsername(dbConfig.user)
-    hikariConfig.setPassword(dbConfig.pass)
-    hikariConfig.setAutoCommit(false)
-    hikariConfig.setIsolateInternalQueries(true)
-
-    hikariConfig.setMaximumPoolSize(dbConfig.maxPoolSize)
-    dbConfig.testQueryOpt map (hikariConfig.setConnectionTestQuery(_))
-    hikariConfig.setPoolName("hikariCP")
-
-
-    hikariConfig.addDataSourceProperty("dataSource.cachePrepStmts", dbConfig.cachePrepStmts)
-    hikariConfig.addDataSourceProperty("dataSource.prepStmtCacheSize", dbConfig.prepStmtCacheSize)
-    hikariConfig.addDataSourceProperty("dataSource.prepStmtCacheSqlLimit", dbConfig.prepStmtCacheSqlLimit)
-    hikariConfig.addDataSourceProperty("dataSource.useServerPrepStmts", dbConfig.useServerPrepStmts)
-
-    new HikariDataSource(hikariConfig)
-
   }
 
 
