@@ -170,32 +170,16 @@ class DbV1Spec extends DbSpecSetup {
       case e: Error => println(e)
     }
 
-    try {
-      fixture.table.find(where("id = ?", 999999)) match {
-        case Some(r) => fail("there is a row with 999999,  should have thrown ex ...")
-        case x =>
-      }
-
-    } catch {
-      case e: Error =>
+    fixture.table.find(where("id = ?", 999999)) match {
+      case Some(r) => fail("there is a row with 999999,  should have thrown ex ...")
+      case x =>
     }
 
-    try {
-      fixture.dbUnderTest.inTransaction {
-        fixture.table.insert(999999, "strId", time, 45)
-      }
-    } catch {
-      case e: Error => println(e)
-    }
+    fixture.dbUnderTest.inTransaction {
+      fixture.table.insert(999999, "strId", time, 45)
 
-    try {
-      fixture.table.find(where("id = ?", 999999)) match {
-        case Some(r) =>
-        case x => fail("there is no row with 999999...")
-      }
-
-    } catch {
-      case e: Error =>
+      fixture.table.find(where("id = ?", 999999))
+        .getOrElse(fail("there is no row with 999999..."))
     }
   }
 
@@ -212,15 +196,10 @@ class DbV1Spec extends DbSpecSetup {
       case e: Error => println(e)
     }
 
-    try {
-      fixture.table.find(where("id = ?", 999999)) match {
-        case Some(r) => fail("there is a row with 999999,  should have thrown ex ...")
-        case x =>
-      }
 
-    } catch {
-      case e: Error =>
-    }
+    assert(fixture.table.find(where("id = ?", 999999)).isEmpty,
+      "there is a row with 999999,  should have thrown ex ...")
+
   }
   it should " honour executeSql from db level transaction " in {
     val time = new Date()
