@@ -19,7 +19,9 @@ package object db {
   class DbException(msg: String) extends RuntimeException(msg)
   class DbError(msg: String) extends Error(msg)
 
-  type Rows = IndexedSeq[Row]
+  type QueryResults[A] = IndexedSeq[A]
+  type Rows = QueryResults[Row]
+
 
   type SimpleColumnTypes =
       String with

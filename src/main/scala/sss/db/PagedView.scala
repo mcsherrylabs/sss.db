@@ -92,9 +92,10 @@ object PagedView {
 
   implicit class ToStream(val pagedView: PagedView) extends AnyVal {
 
+    //There is no Stream.unfold in std lib as of 2.13
     def toStream: Stream[Rows] = {
       def stream(p: Page): Stream[Rows] = {
-        if (p.rows.isEmpty) Stream.empty[Rows]
+        if (p.rows.isEmpty) Stream.empty
         else if (p.hasNext) p.rows #:: stream(p.next)
         else p.rows #:: Stream.empty[Rows]
       }

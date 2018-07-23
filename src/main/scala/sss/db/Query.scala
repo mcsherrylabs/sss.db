@@ -95,10 +95,15 @@ class Query private[db] (private val selectSql: String,
 
   def getRow(id: Long): Option[Row] = getRow(where("id = ?", id))
 
-  def map[B, W <% Where](f: Row => B, where: W = where()): IndexedSeq[B] = filter(where).map(f)
+  def map[B, W <% Where](f: Row => B, where: W = where()): QueryResults[B] = filter(where).map(f)
 
-  def flatMap[Q, W <% Where](f: Row => Q, where: W = where()): IndexedSeq[Q] = filter(where).map(f)
-  def withFilter(f: Row => Boolean): Rows = filter(where()).filter(f)
+  def flatMap[B, W <% Where](f: Row => QueryResults[B], where: W = where()): QueryResults[B] = {
+    map(identity, where)
+      .foldLeft(List[B]())((acc,e) => acc ++ f(e))
+      .toIndexedSeq
+  }
+
+  def withFilter(f: Row => Boolean) = map(identity).withFilter(f)
 
   def foreach[W <% Where](f: Row => Unit, where: W = where()): Unit = map(f, where)
 
