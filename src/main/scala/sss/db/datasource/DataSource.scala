@@ -1,5 +1,6 @@
 package sss.db.datasource
 
+import com.typesafe.config.Config
 import sss.ancillary.DynConfig
 
 
@@ -8,6 +9,7 @@ object DataSource {
   type CloseableDataSource = javax.sql.DataSource with AutoCloseable
 
   def apply(dsConfig: DataSourceConfig) :CloseableDataSource = HikariDataSource(dsConfig)
+  def apply(dsConfig: Config) :CloseableDataSource = apply(DynConfig[DataSourceConfig](dsConfig))
   def apply(dbConfigName: String = "database.datasource") : CloseableDataSource =
     apply(DynConfig[DataSourceConfig](dbConfigName))
 

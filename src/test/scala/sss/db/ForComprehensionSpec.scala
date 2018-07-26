@@ -52,8 +52,8 @@ class ForComprehensionSpec extends DbSpecSetup {
       name <- tableNames
       table = fixture.dbUnderTest.table(name)
       rows <- table.toPaged(3).toIterator
-      row  <- rows
-      if(row[Int](idCol) == 1 || row[Int](idCol) == 9)
+      row <- rows
+      if (row[Int](idCol) == 1 || row[Int](idCol) == 9)
     } yield (row)
 
     //allRows.foreach(println)
@@ -61,10 +61,23 @@ class ForComprehensionSpec extends DbSpecSetup {
 
     val checked = for {
       r <- allRows
-      if(r[Int](idCol) != 1 && r[Int](idCol) != 9)
+      if (r[Int](idCol) != 1 && r[Int](idCol) != 9)
     } yield (r)
     assert(checked.size === 0)
+  }
 
+  it should " support paged iterable generator " in {
+    val tableNames = createAndFillTenTables
+    val allRows = for {
+      name <- tableNames
+      table = fixture.dbUnderTest.table(name)
+      rows <- table.toPaged(3)
+      row  <- rows
+      if(row[Int](idCol) == 1 || row[Int](idCol) == 9)
+    } yield (row)
+
+    //allRows.foreach(println)
+    assert(allRows.size === 20)
   }
 
   it should " support nested generator (thru flatMap) " in {

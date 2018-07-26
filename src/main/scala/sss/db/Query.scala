@@ -93,7 +93,7 @@ class Query private[db] (private val selectSql: String,
     }
   }
 
-  def getRow(id: Long): Option[Row] = getRow(where("id = ?", id))
+  def getRow(rowId: Long): Option[Row] = getRow(where(id -> rowId))
 
   def map[B, W <% Where](f: Row => B, where: W = where()): QueryResults[B] = filter(where).map(f)
 

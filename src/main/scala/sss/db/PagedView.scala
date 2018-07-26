@@ -18,7 +18,11 @@ trait Page {
   def tx[T](f: => T)
 }
 
-case class PageImpl private (indexCol: String, view: Query, rows: Rows, pageSize: Int, filter: (String, Seq[Any])) extends Page {
+private case class PageImpl private (indexCol: String,
+                                     view: Query,
+                                     rows: Rows,
+                                     pageSize: Int,
+                                     filter: (String, Seq[Any])) extends Page {
 
   require(!rows.isEmpty, "The EmptyPage handles no row situations.")
 

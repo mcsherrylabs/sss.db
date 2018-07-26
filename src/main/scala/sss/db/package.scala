@@ -87,11 +87,20 @@ package object db {
   sealed case class OrderDesc(colName: String) extends OrderBy
   sealed case class OrderAsc(colName: String) extends OrderBy
 
-  sealed class Where private[db] (val clause: String, val params: Seq[Any] = Seq.empty, val orderBys: OrderBys = OrderBys()) {
-    def apply(prms: Any*): Where = new Where(clause = clause, params = prms)
-    def orderBy(orderBys: OrderBys): Where = new Where(clause, params, orderBys)
-    def orderBy(orderBys: OrderBy*): Where = new Where(clause, params, OrderBys(orderBys, None))
-    def limit(page: Int): Where = new Where(clause, params, orderBys.limit(page))
+  private[db] sealed class Where(
+                                     private[db] val clause: String,
+                                     private[db] val params: Seq[Any] = Seq.empty,
+                                     private[db] val orderBys: OrderBys = OrderBys()) {
+    private def copy(clause: String = this.clause,
+                     params:Seq[Any] = this.params,
+                     orderBys:OrderBys = this.orderBys): Where =
+      new Where(clause, params , orderBys)
+
+    def apply(prms: Any*): Where = copy(params = prms)
+    def using(prms: Any*): Where = apply(prms :_*)
+    def orderBy(orderBys: OrderBys): Where = copy(orderBys = orderBys)
+    def orderBy(orderBys: OrderBy*): Where = copy(orderBys = OrderBys(orderBys, this.orderBys.limit))
+    def limit(page: Int): Where = copy(orderBys = orderBys.limit(page))
     private [db] def sql: String = {
       val where = if(!clause.isEmpty) s" WHERE $clause" else ""
       where + orderBys.sql
