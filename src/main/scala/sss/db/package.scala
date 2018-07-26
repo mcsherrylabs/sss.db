@@ -87,7 +87,7 @@ package object db {
   sealed case class OrderDesc(colName: String) extends OrderBy
   sealed case class OrderAsc(colName: String) extends OrderBy
 
-  private[db] sealed class Where(
+  sealed class Where private[db] (
                                      private[db] val clause: String,
                                      private[db] val params: Seq[Any] = Seq.empty,
                                      private[db] val orderBys: OrderBys = OrderBys()) {
