@@ -85,5 +85,5 @@ val allDomainObjs = for {
       rows <- table.toPaged(300)
       row  <- rows
       if(row[Long](salaryCol) > 100000)
-    } yield (row -> Domain(row))
+    } yield (Domain(row))
 ```    
