@@ -26,6 +26,7 @@ object HikariDataSource {
     hikariConfig.setPassword(dsConfig.pass)
     hikariConfig.setAutoCommit(false)
     hikariConfig.setIsolateInternalQueries(true)
+    hikariConfig.setTransactionIsolation("TRANSACTION_REPEATABLE_READ")
 
     hikariConfig.setMaximumPoolSize(dsConfig.maxPoolSize)
     dsConfig.testQueryOpt map (hikariConfig.setConnectionTestQuery(_))
