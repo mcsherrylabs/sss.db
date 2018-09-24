@@ -62,6 +62,8 @@ trait Tx extends Logging {
     }
   }
 
+  def tx[T](isoLevel: Int, f: => T): T = inTransaction[T](isoLevel, f)
+
   def tx[T](f: => T): T = inTransaction[T](f)
 
   def validateTx[T](isolationLevel: Option[Int] = None)(f: => T): Try[T] = Try {
@@ -78,20 +80,16 @@ trait Tx extends Logging {
     }
   }
 
-  def validateTx[T](f: => T): Try[T] = Try {
+  def validateTx[T](f: => T): Try[T] = validateTx[T](None)(f)
 
-    require(startTx(), "Must validate in standalone tx")
+  def inTransaction[T](isoLevel:Int, f: => T): T =
+    inTransactionImpl(f)(startTx(isoLevel))
 
-    try {
-      f
-    } finally {
-      conn.rollback()
-      closeTx
-    }
-  }
+  def inTransaction[T](f: => T): T =
+    inTransactionImpl(f)(startTx())
 
-  def inTransaction[T](f: => T): T = {
-    val isNew = startTx()
+  private def inTransactionImpl[T](f: => T)(sTx: => Boolean): T = {
+    val isNew = sTx
     try {
       val r = f
       if (isNew) conn.commit()
