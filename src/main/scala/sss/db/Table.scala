@@ -1,68 +1,8 @@
 package sss.db
 
-import java.sql.{Connection, Statement}
+import java.sql.Statement
+
 import javax.sql.DataSource
-
-import sss.ancillary.Logging
-
-import scala.util.control.NonFatal
-
-trait Tx extends Logging {
-
-  private[db] val ds: DataSource
-  private[db] def conn: Connection = Tx.get.conn
-
-  def startTx: Boolean = {
-    Option(Tx.get()) match {
-      case None =>
-        // auto commit should be off by default
-        Tx.set(ConnectionTracker(ds.getConnection, 0))
-        true
-      case Some(existing) =>
-        Tx.set(ConnectionTracker(existing.conn, existing.count + 1))
-        false
-    }
-
-  }
-
-  def closeTx = {
-    val existing = Tx.get()
-    if (existing == null) throw new IllegalStateException("Closing a non existing tx?")
-    else {
-      if (existing.count == 0) {
-        existing.conn.close
-        Tx.remove
-      } else {
-        Tx.set(ConnectionTracker(existing.conn, existing.count - 1))
-      }
-
-    }
-
-  }
-
-  def tx[T](f: => T): T = inTransaction[T](f)
-
-  def inTransaction[T](f: => T): T = {
-    val isNew = startTx
-    try {
-      val r = f
-      if (isNew) conn.commit()
-      r
-    } catch {
-      case NonFatal(e) =>
-        log.debug("ROLLING BACK!", e)
-        conn.rollback
-        throw e
-    } finally {
-      closeTx
-    }
-
-  }
-}
-
-private[db] case class ConnectionTracker(conn: Connection, count: Int)
-
-private[db] object Tx extends ThreadLocal[ConnectionTracker]
 
 class Table private[db] ( name: String,
              ds: DataSource,

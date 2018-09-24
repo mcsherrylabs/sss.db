@@ -128,6 +128,8 @@ package object db {
       case x => false
     }
 
+    def id: Long = apply[Long]("id")
+
     override def hashCode = asMap.hashCode
 
     def get(col: String) = asMap(col.toLowerCase)
