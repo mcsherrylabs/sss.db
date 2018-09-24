@@ -27,5 +27,6 @@ trait DataSourceConfig {
   val connectionProperties: String
   val user: String
   val pass: String
+  val transactionIsolationLevel: String
 }
 
