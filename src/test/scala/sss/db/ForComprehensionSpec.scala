@@ -2,6 +2,8 @@ package sss.db
 
 import org.scalatest.DoNotDiscover
 
+import scala.util.Try
+
 @DoNotDiscover
 class ForComprehensionSpec extends DbSpecSetup {
 
@@ -79,6 +81,58 @@ class ForComprehensionSpec extends DbSpecSetup {
     //allRows.foreach(println)
     assert(allRows.size === 20)
   }
+
+  it should " support commit in transactions using Try " in {
+
+    val x = 1000
+    val t = fixture.dbUnderTest.table("testForComp")
+
+    import t.tx
+
+    def goodTx2(r: Int): Try[Int] = Try(t.insert(r, r + 1, "strId" + r))
+
+    def goodTx1: Try[Int] = Try(t.insert(x, x + 1, "strId" + x))
+
+    val result: Try[Int] = tx {
+      for {
+        v1 <- goodTx1
+        v2 <- goodTx2(x + v1)
+      } yield (v2)
+    }
+
+    assert(result.isSuccess)
+    assert(result.get == 1, "Should only insert 1 row")
+    assert(t.find(where(idCol -> x)).isDefined, "tx should have committed ")
+    assert(t.find(where(idCol -> (x + 1))).isDefined, "tx should have committed second write also")
+
+  }
+
+  it should " support rollback in transactions using Try " in {
+
+    val x = 1000
+    val t = fixture.dbUnderTest.table("testForComp")
+
+    import t.tx
+
+    def badTx(r: Int): Try[Int] = Try {
+      assert(r == x + 1)
+      throw new RuntimeException("Woh!")
+    }
+
+    def goodTx: Try[Int] = Try(t.insert(x, x + 1, "strId" + x))
+
+    val result: Try[Int] = tx {
+      for {
+        v1 <- goodTx
+        v2 <- badTx(v1)
+      } yield (v2)
+    }
+    assert(result.isFailure, "Should have thrown exception in badTx")
+    assert(t.find(where(idCol -> x)).isEmpty, "tx rollback should have prevented row write")
+
+  }
+
+
 
   it should " support nested generator (thru flatMap) " in {
     val tableNames = createAndFillTenTables

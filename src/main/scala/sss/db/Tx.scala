@@ -5,8 +5,7 @@ import java.sql.Connection
 import javax.sql.DataSource
 import sss.ancillary.Logging
 
-import scala.util.Try
-import scala.util.control.NonFatal
+import scala.util.{Failure, Success, Try}
 
 private[db] case class ConnectionTracker(conn: Connection, count: Int)
 
@@ -62,7 +61,11 @@ trait Tx extends Logging {
     }
   }
 
+  def tx[T](isoLevel: Int, f: => Try[T]): Try[T] = inTransactionImpl[T](f)(startTx(isoLevel))
+
   def tx[T](isoLevel: Int, f: => T): T = inTransaction[T](isoLevel, f)
+
+  def tx[T](f: => Try[T]): Try[T] = inTransactionImpl[T](f)(startTx())
 
   def tx[T](f: => T): T = inTransaction[T](f)
 
@@ -83,25 +86,20 @@ trait Tx extends Logging {
   def validateTx[T](f: => T): Try[T] = validateTx[T](None)(f)
 
   def inTransaction[T](isoLevel:Int, f: => T): T =
-    inTransactionImpl(f)(startTx(isoLevel))
+    inTransactionImpl(Try(f))(startTx(isoLevel)).get
 
   def inTransaction[T](f: => T): T =
-    inTransactionImpl(f)(startTx())
+    inTransactionImpl(Try(f))(startTx()).get
 
-  private def inTransactionImpl[T](f: => T)(sTx: => Boolean): T = {
+  private def inTransactionImpl[T](f: => Try[T])(sTx: => Boolean): Try[T] = {
     val isNew = sTx
-    try {
-      val r = f
-      if (isNew) conn.commit()
-      r
-    } catch {
-      case NonFatal(e) =>
-        log.debug("ROLLING BACK!", e)
-        conn.rollback
-        throw e
-    } finally {
-      closeTx
+    val r = f
+    r match {
+      case Failure(e) => conn.rollback
+      case Success(_) => if (isNew) conn.commit()
     }
-
+    closeTx
+    r
   }
+
 }
