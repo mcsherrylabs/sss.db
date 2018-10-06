@@ -91,15 +91,30 @@ trait Tx extends Logging {
   def inTransaction[T](f: => T): T =
     inTransactionImpl(Try(f))(startTx()).get
 
-  private def inTransactionImpl[T](f: => Try[T])(sTx: => Boolean): Try[T] = {
-    val isNew = sTx
-    val r = f
-    r match {
-      case Failure(e) => conn.rollback
-      case Success(_) => if (isNew) conn.commit()
-    }
-    closeTx
-    r
-  }
+  private def inTransactionImpl[T](f: => Try[T])(starTx: => Boolean): Try[T] = {
 
+    val result = for {
+      isNew <- Try(starTx)
+      produceF <- Try(f)
+      produceTry <- produceF
+    } yield (isNew, produceTry)
+
+
+    def transform(r: Try[(Boolean, T)]): Try[T] = r match {
+
+        case Success((isNew, t)) =>
+
+          if (isNew) conn.commit()
+          closeTx
+          Success(t)
+
+        case Failure(e) =>
+
+          conn.rollback
+          closeTx
+          Failure(e)
+      }
+
+    transform(result)
+  }
 }
