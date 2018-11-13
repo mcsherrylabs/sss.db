@@ -23,7 +23,7 @@ class View private[db] (val name: String,
   extends Query(s"SELECT ${columns} from ${name}", ds, freeBlobsEarly)  with Logging {
 
 
-  def maxId: Long = max(id)
+  def maxId(): Long = max(id)
 
   def max(colName: String): Long = tx {
     val st = conn.createStatement() // statement objects can be reused with

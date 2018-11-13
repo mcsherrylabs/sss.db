@@ -15,6 +15,19 @@ class Table private[db] ( name: String,
     freeBlobsEarly,
     columns) {
 
+  def setNextIdToMaxIdPlusOne(): Unit = inTransaction {
+    setNextId(maxId() + 1)
+  }
+
+  def setNextId(next: Long): Unit = {
+
+    val ps = conn.createStatement()
+    try {
+      ps.execute(s"ALTER TABLE ${name} ALTER COLUMN id RESTART WITH ${next};")
+    } finally ps.close
+
+  }
+
   @throws[DbOptimisticLockingException]("if the row has been updated after you read it")
   def update(values: Map[String, Any]): Row = inTransaction {
 
