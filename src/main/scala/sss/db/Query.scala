@@ -162,7 +162,7 @@ class Query private[db] (private val selectSql: String,
       val orderClausesStr = orderByClausesToString(orderClauses)
       val rs = st.executeQuery(s"${selectSql} $orderClausesStr LIMIT ${start}, ${pageSize}")
       Rows(rs, freeBlobsEarly)
-    } finally st.close
+    } finally st.close()
   }
 
   def toPaged(pageSize: Int,

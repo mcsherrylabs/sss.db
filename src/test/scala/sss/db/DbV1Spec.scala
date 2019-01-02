@@ -222,4 +222,44 @@ class DbV1Spec extends DbSpecSetup {
 
   }
 
+  it should "correctly find using 'in' syntax" in {
+    val time = new Date()
+    fixture.table.insert(999999, "strId", time, 45)
+    fixture.table.insert(4, "strId", time, 45)
+    val rows = fixture.table.filter(where("id") in Set(999999,3,4))
+    assert(rows.size == 2)
+    val rows2 = fixture.table.filter(where("id") in Set(999999,3))
+    assert(rows2.head.id === 999999)
+  }
+
+  it should "correctly find using 'not in' syntax" in {
+    val time = new Date()
+    fixture.table.insert(999999, "strId", time, 45)
+    fixture.table.insert(4, "strId", time, 45)
+    val rows = fixture.table.filter(where("id") notIn Set(999999,3,4))
+    assert(rows.size == 0)
+    val rows2 = fixture.table.filter(where("id") notIn Set(3))
+    assert(rows2.size === 2)
+  }
+
+  it should "correctly find using 'in' syntax with orderby and limit " in {
+    val time = new Date()
+    fixture.table.insert(999999, "strId", time, 45)
+    fixture.table.insert(4, "strId", time, 45)
+    val rows = fixture.table.filter(where("id") in Set(999999,3,4) orderBy OrderAsc("id") limit 1)
+    assert(rows.head.id === 4)
+  }
+
+  it should "correctly find using existing where plus 'in' syntax with orderby and limit " in {
+    val time = new Date()
+    fixture.table.insert(999999, "strId", time, 45)
+    fixture.table.insert(4, "strId", time, 45)
+    val rows = fixture.table.filter(
+      where("id > ?", 4) and
+        where ("id") in Set(999999,3,4)
+        orderBy OrderAsc("id")
+        limit 1
+    )
+    assert(rows.head.id === 999999)
+  }
 }

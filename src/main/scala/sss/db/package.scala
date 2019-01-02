@@ -3,6 +3,7 @@ package sss
 import java.io.{ByteArrayInputStream, InputStream}
 import java.math.BigDecimal
 import java.sql.Blob
+import java.util.regex.Pattern
 
 import scala.collection.mutable
 import scala.collection.mutable.WrappedArray
@@ -59,7 +60,12 @@ package object db {
 
   type Limit = Option[Int]
 
-  trait OrderBy
+  trait OrderBy {
+    val regex = "^[a-zA-Z_][a-zA-Z0-9_]*$"
+    val colName: String
+    val pattern = Pattern.compile(regex)
+    require(pattern.matcher(colName).matches(), s"Column name must conform to pattern $regex")
+  }
 
   object OrderBys {
     def apply(pageSize:Int, orderBys: OrderBy*): OrderBys = OrderBys(orderBys.toSeq, Some(pageSize))
@@ -97,7 +103,23 @@ package object db {
       new Where(clause, params , orderBys)
 
     def apply(prms: Any*): Where = copy(params = prms)
+
+    def and(w: Where): Where = {
+      val newClause = if(clause.nonEmpty && w.clause.nonEmpty) clause + " AND " + w.clause
+      else clause + w.clause
+      copy(clause = newClause, params = params ++ w.params)
+    }
+
+    def notIn(params: Set[_]): Where = in(params, true)
+    def in(params: Set[_], neg: Boolean = false): Where = {
+      val str = Seq.fill(params.size)("?") mkString(",")
+      val isNot = if(neg) " NOT" else ""
+      val newClause = s"$clause$isNot IN ($str)"
+      copy(newClause, this.params ++ params)
+    }
     def using(prms: Any*): Where = apply(prms :_*)
+    def orderAsc(colsAsc: String*): Where = copy(orderBys = OrderBys(colsAsc map (OrderAsc(_)), this.orderBys.limit))
+    def orderDesc(colsDesc: String*): Where = copy(orderBys = OrderBys(colsDesc map (OrderDesc(_)), this.orderBys.limit))
     def orderBy(orderBys: OrderBys): Where = copy(orderBys = orderBys)
     def orderBy(orderBys: OrderBy*): Where = copy(orderBys = OrderBys(orderBys, this.orderBys.limit))
     def limit(page: Int): Where = copy(orderBys = orderBys.limit(page))
