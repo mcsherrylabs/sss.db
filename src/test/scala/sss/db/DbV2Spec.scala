@@ -7,7 +7,7 @@ import org.scalatest.DoNotDiscover
 
 import scala.collection.mutable
 
-@DoNotDiscover
+//@DoNotDiscover
 class DbV2Spec extends DbSpecSetup {
 
   "A Db " should " allow persist(update) using a map " in {
@@ -77,7 +77,7 @@ class DbV2Spec extends DbSpecSetup {
 
   }
 
-  it should " be able to delete a row " in {
+  it should " be able to delete a row" in {
 
     val time = new Date()
     val r1 = fixture.table.persist(Map(("strId" -> "strId"), ("createTime" -> time), ("intVal" -> 45)))
@@ -85,7 +85,26 @@ class DbV2Spec extends DbSpecSetup {
     assert(r1 == r2.get)
     val deletedRowCount = fixture.table.delete(where(ps"id = ${r1("id")}"))
     assert(deletedRowCount === 1)
-    assert(fixture.table.find(where("id = ?", r1("id"))) == None)
+    assert(fixture.table.find(where("id = ?", r1("id"))).isEmpty)
+  }
+
+  it should " be able to delete a row but respect limit " in {
+
+    val time = new Date()
+    val r1 = fixture.table.persist(Map(("strId" -> "strId"), ("createTime" -> time), ("intVal" -> 45)))
+    val r3 = fixture.table.persist(Map(("strId" -> "strId2"), ("createTime" -> time), ("intVal" -> 45)))
+
+    val rowFilter = where("id > ?", 0)
+
+    val r2 = fixture.table.filter(rowFilter)
+    assert(r2.size > 1, "Should be more than 1 to make the delete limit take effect")
+
+    val deletedRowCountWithLimit = fixture.table.delete(rowFilter limit 1)
+    assert(deletedRowCountWithLimit === 1)
+
+    val deletedRowCount = fixture.table.delete(rowFilter)
+    assert(deletedRowCount >= 1, "It should have deleted at least one other row once the limit is removed.")
+
   }
 
   it should " support paging in large tables " in {

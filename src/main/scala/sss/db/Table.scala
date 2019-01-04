@@ -115,7 +115,7 @@ class Table private[db] ( name: String,
 
   def delete(where: Where): Int = tx[Int] {
 
-    val ps = prepareStatement(s"DELETE FROM ${name} WHERE ${where.clause}", where.params)
+    val ps = prepareStatement(s"DELETE FROM $name ${where.sql}", where.params)
     try {
       ps.executeUpdate(); // run the query
     } finally {
