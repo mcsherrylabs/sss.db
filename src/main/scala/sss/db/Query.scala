@@ -69,15 +69,6 @@ class Query private[db] (private val selectSql: String,
     new Where(sql, asMap.values.toSeq)
   }
 
-  private def orderByClausesToString(orderClauses: Seq[OrderBy]): String = {
-    if(orderClauses.nonEmpty)
-      " ORDER BY " + orderClauses.map {
-        case OrderDesc(col) => s"$col DESC"
-        case OrderAsc(col) => s"$col ASC"
-      }.mkString(",")
-    else ""
-  }
-
   /**
     *
     * @param sql
@@ -159,8 +150,8 @@ class Query private[db] (private val selectSql: String,
   def page(start: Long, pageSize: Int, orderClauses: Seq[OrderBy] = Seq(OrderAsc("id"))): Rows = tx {
     val st = conn.createStatement()
     try {
-      val orderClausesStr = orderByClausesToString(orderClauses)
-      val rs = st.executeQuery(s"${selectSql} $orderClausesStr LIMIT ${start}, ${pageSize}")
+      val clause = where() orderBy(orderClauses:_*) limit(start, pageSize)
+      val rs = st.executeQuery(s"${selectSql} ${clause.sql}")
       Rows(rs, freeBlobsEarly)
     } finally st.close()
   }

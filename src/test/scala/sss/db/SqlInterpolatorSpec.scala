@@ -54,17 +54,17 @@ class SqlInterpolatorSpec extends FlatSpec with Matchers with BeforeAndAfter {
 
   "orderDesc created with string columns" should "produce descending cols " in {
     val w = where().orderDesc("a", "b", "c")
-    assert(w.sql === " ORDER BY a DESC,b DESC,c DESC")
+    assert(w.sql === " ORDER BY a DESC NULLS LAST,b DESC NULLS LAST,c DESC NULLS LAST")
   }
 
   "orderDesc created with string columns" should "produce descending cols and respect limit " in {
     val w = where() orderDesc("a", "b", "c") limit 10
-    assert(w.sql === " ORDER BY a DESC,b DESC,c DESC LIMIT 10")
+    assert(w.sql === " ORDER BY a DESC NULLS LAST,b DESC NULLS LAST,c DESC NULLS LAST LIMIT 10")
   }
 
   "orderAsc created with string columns" should "produce ascending cols and respect limit" in {
-    val w = where() orderAsc("a", "b", "c") limit 6
-    assert(w.sql === " ORDER BY a ASC,b ASC,c ASC LIMIT 6")
+    val w = where() orderAsc("a", "b", "c") limit (6, 10)
+    assert(w.sql === " ORDER BY a ASC NULLS LAST,b ASC NULLS LAST,c ASC NULLS LAST LIMIT 6, 10")
   }
 
   "Where " should "allow applied params to change" in {

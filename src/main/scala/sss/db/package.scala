@@ -5,6 +5,8 @@ import java.math.BigDecimal
 import java.sql.Blob
 import java.util.regex.Pattern
 
+import sss.db.NullOrder.NullOrder
+
 import scala.collection.mutable
 import scala.collection.mutable.WrappedArray
 import scala.language.implicitConversions
@@ -58,7 +60,14 @@ package object db {
 
   implicit def toMap(r: Row): Map[String, _] = r.asMap
 
-  type Limit = Option[Int]
+  sealed case class LimitParams(page: Int, start: Option[Long] = None)
+  type Limit = Option[LimitParams]
+
+  object NullOrder extends Enumeration {
+    type NullOrder = Value
+    val NullsFirst = Value("NULLS FIRST")
+    val NullsLast = Value("NULLS LAST")
+  }
 
   trait OrderBy {
     val regex = "^[a-zA-Z_][a-zA-Z0-9_]*$"
@@ -68,15 +77,19 @@ package object db {
   }
 
   object OrderBys {
-    def apply(pageSize:Int, orderBys: OrderBy*): OrderBys = OrderBys(orderBys.toSeq, Some(pageSize))
+    def apply(start:Int, pageSize:Int, orderBys: OrderBy*): OrderBys =
+      OrderBys(orderBys.toSeq, Some(LimitParams(pageSize, Some(start))))
+    def apply(pageSize:Int, orderBys: OrderBy*): OrderBys = OrderBys(orderBys.toSeq, Some(LimitParams(pageSize)))
     def apply(orderBys: OrderBy*): OrderBys = OrderBys(orderBys.toSeq, None)
   }
 
   sealed case class OrderBys(orderBys: Seq[OrderBy] = Seq.empty, limit: Limit = None) {
-    def limit(limit: Int): OrderBys = OrderBys(orderBys, Some(limit))
+    def limit(start:Long, limit: Int): OrderBys = OrderBys(orderBys, Some(LimitParams(limit,Some(start))))
+    def limit(limit: Int): OrderBys = OrderBys(orderBys, Some(LimitParams(limit)))
     private [db] def sql: String = {
       orderByClausesToString(orderBys) + (limit match {
-        case Some(l) => s" LIMIT $l"
+        case Some(LimitParams(limit,Some(start))) => s" LIMIT $start, $limit"
+        case Some(LimitParams(limit,None)) => s" LIMIT $limit"
         case None    => ""
       })
     }
@@ -84,14 +97,14 @@ package object db {
     private def orderByClausesToString(orderClauses: Seq[OrderBy]): String = {
       if(orderClauses.nonEmpty)
         " ORDER BY " + orderClauses.map {
-          case OrderDesc(col) => s"$col DESC"
-          case OrderAsc(col) => s"$col ASC"
+          case OrderDesc(col, no) => s"$col DESC $no"
+          case OrderAsc(col, no) => s"$col ASC $no"
         }.mkString(",")
       else ""
     }
   }
-  sealed case class OrderDesc(colName: String) extends OrderBy
-  sealed case class OrderAsc(colName: String) extends OrderBy
+  sealed case class OrderDesc(colName: String, nullOrder: NullOrder = NullOrder.NullsLast) extends OrderBy
+  sealed case class OrderAsc(colName: String, nullOrder: NullOrder = NullOrder.NullsLast) extends OrderBy
 
   sealed class Where private[db] (
                                      private[db] val clause: String,
@@ -122,6 +135,7 @@ package object db {
     def orderDesc(colsDesc: String*): Where = copy(orderBys = OrderBys(colsDesc map (OrderDesc(_)), this.orderBys.limit))
     def orderBy(orderBys: OrderBys): Where = copy(orderBys = orderBys)
     def orderBy(orderBys: OrderBy*): Where = copy(orderBys = OrderBys(orderBys, this.orderBys.limit))
+    def limit(start: Long, page: Int): Where = copy(orderBys = orderBys.limit(start, page))
     def limit(page: Int): Where = copy(orderBys = orderBys.limit(page))
     private [db] def sql: String = {
       val where = if(!clause.isEmpty) s" WHERE $clause" else ""
@@ -176,7 +190,11 @@ package object db {
       } else if (typeOf[T] == typeOf[InputStream] && rawVal.isInstanceOf[Array[Byte]]) {
         val aryByte = rawVal.asInstanceOf[Array[Byte]]
         new ByteArrayInputStream(aryByte)
-      } else if (typeOf[T] == typeOf[Option[_]])
+      } else if (typeOf[T] =:= typeOf[ColumnTypes]) {
+        //in the case where NO parameter type is passed it defaults to ColumnTypes
+        // and ColumnTypes will match typeOf[Option[_]] so we must prevent that here
+        rawVal
+      } else if (typeOf[T] <:< typeOf[Option[_]])
         Some(rawVal)
       else rawVal
 

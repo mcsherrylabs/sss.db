@@ -69,12 +69,35 @@ class DbV2Spec extends DbSpecSetup {
     assert(r1 == r2.get)
   }
 
-  it should " count table rows " in {
+  it should "count table rows " in {
 
     val time = new Date()
     for (i <- 0 to 10) fixture.table.persist(Map(("strId" -> "strId"), ("createTime" -> time), ("intVal" -> 45)))
     assert(11 == fixture.table.count)
 
+  }
+
+  it should "respect null first and last" in {
+
+    val time = new Date()
+    fixture.table.persist(Map(("strId" -> None), ("createTime" -> time), ("intVal" -> 101)))
+    fixture.table.persist(Map(("strId" -> None), ("createTime" -> time), ("intVal" -> 102)))
+    fixture.table.persist(Map(("strId" -> "103"), ("createTime" -> time), ("intVal" -> 103)))
+    fixture.table.persist(Map(("strId" -> "104"), ("createTime" -> time), ("intVal" -> 104)))
+
+    val nullsLastRows = fixture.table.filter(
+      where("intVal > ?", 100)
+        orderBy OrderAsc("strId", NullOrder.NullsLast)
+    )
+    nullsLastRows.drop(2).foreach (r => assert(r[Option[String]]("strId").isEmpty))
+    nullsLastRows take(2) foreach (r => assert(r[Option[String]]("strId").isDefined))
+
+    val nullsFirstRows = fixture.table.filter(
+      where("intVal > ?", 100)
+        orderBy OrderAsc("strId", NullOrder.NullsFirst)
+    )
+    nullsFirstRows drop(2) foreach (r => assert(r[Option[String]]("strId").isDefined))
+    nullsFirstRows take(2) foreach (r => assert(r[Option[String]]("strId").isEmpty))
   }
 
   it should " be able to delete a row" in {
@@ -91,8 +114,8 @@ class DbV2Spec extends DbSpecSetup {
   it should " be able to delete a row but respect limit " in {
 
     val time = new Date()
-    val r1 = fixture.table.persist(Map(("strId" -> "strId"), ("createTime" -> time), ("intVal" -> 45)))
-    val r3 = fixture.table.persist(Map(("strId" -> "strId2"), ("createTime" -> time), ("intVal" -> 45)))
+    val r1 = fixture.table.persist(Map("strId" -> "strId", "createTime" -> time, "intVal" -> 45))
+    val r3 = fixture.table.persist(Map("strId" -> "strId2", "createTime" -> time, "intVal" -> 45))
 
     val rowFilter = where("id > ?", 0)
 
@@ -144,7 +167,7 @@ class DbV2Spec extends DbSpecSetup {
     val page = fixture.table.page(1000, 1)
     assert(page.isEmpty)
   }
-  it should " support views  " in {
+  it should "support views" in {
 
     val time = new Date()
 
@@ -221,7 +244,7 @@ class DbV2Spec extends DbSpecSetup {
 
   }
 
-  it should " support persisting wrapped binary arrays as a blob " in {
+  it should "support persisting wrapped binary arrays as a blob" in {
 
     val testStr = "Hello My Friend"
     val table = fixture.dbUnderTest.testBinary
@@ -233,7 +256,7 @@ class DbV2Spec extends DbSpecSetup {
     }
 
   }
-  it should " support find along binary arrays " in {
+  it should "support find along binary arrays" in {
 
     val testStr = "Hello My Friend"
     val table = fixture.dbUnderTest.testBinary
