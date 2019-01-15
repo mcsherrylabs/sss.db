@@ -7,7 +7,7 @@ import org.scalatest.DoNotDiscover
 
 import scala.collection.mutable
 
-//@DoNotDiscover
+@DoNotDiscover
 class DbV2Spec extends DbSpecSetup {
 
   "A Db " should " allow persist(update) using a map " in {
@@ -371,5 +371,24 @@ class DbV2Spec extends DbSpecSetup {
     assert(table.count == 10)
     assert(table.maxId == currentMax + 20)
 
+  }
+
+  it should "insert Enumeration Values" in {
+
+    object TestEnum extends Enumeration {
+      type TestEnum = Value
+      val Test1 = Value(4564345)
+      val Test2 = Value(4564346)
+    }
+
+    fixture.table.persist(Map("strId" -> "strId", "intVal" -> TestEnum.Test1))
+    fixture.table.persist(Map("strId" -> "strId", "intVal" -> TestEnum.Test2))
+
+    val rows = fixture.table.filter(
+      where("intVal") in Set(TestEnum.Test1, TestEnum.Test2)
+    )
+
+    assert(rows.size === 2)
+    assert(rows.forall(r => Seq(TestEnum.Test1.id, TestEnum.Test2.id).contains(r[Int]("intVal"))))
   }
 }

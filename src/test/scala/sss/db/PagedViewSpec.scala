@@ -16,7 +16,7 @@ class PagedViewSpec extends DbSpecSetup {
 
   "A paged View" should " be able to handle an empty table " in {
     view.delete(where("1 = 1"))
-    val pv = PagedView(view, 2, (s"$statusCol = ? ", Seq(0)), idCol)
+    val pv = PagedView(view, 2, where (s"$statusCol = ? ", 0), idCol)
     var page = pv.lastPage
     assert(!page.hasNext)
     assert(!page.hasPrev)
@@ -32,7 +32,7 @@ class PagedViewSpec extends DbSpecSetup {
 
     (1 to 10) foreach { i => view.insert(Map(idCol -> i, statusCol -> 0)) }
 
-    val pv = PagedView(view, 2, (s"$statusCol = ?" -> Seq(0)), idCol)
+    val pv = PagedView(view, 2, where(statusCol -> 0), idCol)
     var page = pv.lastPage
     assert(!page.hasNext)
     assert(page.hasPrev)
@@ -52,7 +52,7 @@ class PagedViewSpec extends DbSpecSetup {
 
 
     (1 to 10) foreach { i => view.insert(Map(idCol -> i, statusCol -> 0)) }
-    val pv = PagedView(view, 3, (s"$statusCol = ?", Seq(0)), idCol)
+    val pv = PagedView(view, 3, where (statusCol -> 0), idCol)
     var page = pv.lastPage
     assert(page.rows.size == 3)
     assert(page.rows(0)[Int](idCol) == 8)
@@ -89,7 +89,7 @@ class PagedViewSpec extends DbSpecSetup {
     (1 to 10) foreach { i => view2.insert(Map(idCol -> i, statusCol -> 0)) }
     Seq(2,4,6,8) foreach { i => view2.update(Map(idCol -> i, statusCol -> 1)) }
 
-    val pv = PagedView(view2, 2, (s"$statusCol = ?", Seq(0)), idCol)
+    val pv = PagedView(view2, 2, where (statusCol -> 0), idCol)
     var page = pv.lastPage
     assert(!page.hasNext)
     assert(page.hasPrev)

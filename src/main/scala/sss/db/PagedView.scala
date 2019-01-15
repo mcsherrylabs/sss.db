@@ -15,23 +15,21 @@ trait Page {
     * An enclosing tx may be necessary if the rows contain Blobs, and early blob freeing is not
     * true. In this case, the blobs are only guaranteed to live until the tx is closed.
     */
-  def tx[T](f: => T)
+  def tx[T](f: => T): T
 }
 
 private case class PageImpl private (indexCol: String,
                                      view: Query,
                                      rows: Rows,
                                      pageSize: Int,
-                                     filter: (String, Seq[Any])) extends Page {
+                                     filter: Where) extends Page {
 
   require(!rows.isEmpty, "The EmptyPage handles no row situations.")
 
   private val firstIndexInPage = rows.head[Number](indexCol).longValue
   private val lastIndexInPage = rows.last[Number](indexCol).longValue
 
-  override def tx[T](f: => T) = view.tx[T](f)
-
-  lazy private val filterClause = if(filter._1.isEmpty) "" else s" AND ${filter._1}"
+  override def tx[T](f: => T): T = view.tx[T](f)
 
   lazy override val next: Page =
     if(hasNext) PageImpl(indexCol, view, nextRows, pageSize, filter)
@@ -42,17 +40,17 @@ private case class PageImpl private (indexCol: String,
     else throw new IllegalAccessException("No previous page")
   }
 
-  lazy override val hasPrev: Boolean = !prevRows.isEmpty
+  lazy override val hasPrev: Boolean = prevRows.nonEmpty
 
-  lazy override val hasNext: Boolean = !nextRows.isEmpty
+  lazy override val hasNext: Boolean = nextRows.nonEmpty
 
   private lazy val nextRows = view.filter(
-    where (s"$indexCol > ? ${filterClause}", (lastIndexInPage +: filter._2):_*)
+    where (s"$indexCol > ?", lastIndexInPage) and filter
       orderBy OrderAsc(indexCol)
       limit pageSize)
 
   private lazy val prevRows = view.filter(
-    where (s"$indexCol < ? ${filterClause}", (firstIndexInPage +: filter._2):_*)
+    where (s"$indexCol < ?", firstIndexInPage) and filter
       orderBy OrderDesc(indexCol)
       limit pageSize)
 
@@ -68,9 +66,11 @@ case class EmptyPage(pagedView: PagedView) extends Page {
 }
 
 object PagedView {
-  def apply(view:Query, pageSize: Int, filter: (String, Seq[Any]) = ("", Seq()), indexCol: String = "id") = {
+
+  def apply(view:Query, pageSize: Int, filter: Where = where(), indexCol: String = "id") = {
     new PagedView(view, pageSize, filter, indexCol)
   }
+
 
   /**
     *
@@ -99,21 +99,21 @@ object PagedView {
 
 class PagedView private ( view:Query,
                           pageSize: Int,
-                          filter: (String, Seq[Any]),
+                          filter: Where,
                           indexCol: String) extends Iterable[Rows] {
 
   /**
     * An enclosing tx may be necessary if the rows contain Blobs, and early blob freeing is not
     * true. In this case, the blobs are only guaranteed to live until the tx is closed.
     */
-  def tx[T](f: => T) = view.tx[T](f)
+  def tx[T](f: => T): T = view.tx[T](f)
 
   override def iterator: Iterator[Rows] = new ToIterator(this).toIterator
 
   def lastPage: Page = {
 
     val rows = view.filter(
-      where (filter)
+      filter
         orderBy OrderDesc(indexCol)
         limit pageSize)
 
@@ -123,7 +123,7 @@ class PagedView private ( view:Query,
 
   def firstPage: Page = {
     val rows = view.filter(
-      where (filter)
+      filter
         orderBy OrderAsc(indexCol)
         limit pageSize)
 

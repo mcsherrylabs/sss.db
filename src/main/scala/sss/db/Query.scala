@@ -1,6 +1,7 @@
 package sss.db
 
 import java.sql.PreparedStatement
+import java.util
 import java.util.Date
 
 import javax.sql.DataSource
@@ -49,6 +50,7 @@ class Query private[db] (private val selectSql: String,
       case v: scala.math.BigDecimal => v.bigDecimal
       case v: scala.math.BigInt => v.bigInteger
       case v: Float => v
+      case v: Enumeration#Value => v.id
       case v => DbError(s"Can't turn ${value} ${value.getClass} into sql value..")
     }
   }
@@ -157,7 +159,7 @@ class Query private[db] (private val selectSql: String,
   }
 
   def toPaged(pageSize: Int,
-              filter: (String, Seq[Any]) = ("", Seq()),
+              filter: Where = where(),
               indexCol: String = "id") =
     PagedView(this, pageSize, filter, indexCol)
 
