@@ -29,9 +29,32 @@ class Table private[db] ( name: String,
   }
 
   @throws[DbOptimisticLockingException]("if the row has been updated after you read it")
+  def update(values: Map[String, Any], where: Where, updateVersionCol: Boolean = false): Row = inTransaction {
+
+    val minusId = values - id
+
+    val params = minusId.keys.map (k => s"$k = ?").mkString(",")
+
+    val versionSql = if (updateVersionCol) ", version = version + 1" else ""
+    val sql = s"UPDATE $name SET $params $versionSql ${where.sql}"
+
+    val ps = prepareStatement(sql, minusId.values.toSeq ++ where.params)
+
+    try {
+      val numRows = ps.executeUpdate()
+      if (updateVersionCol && numRows == 0) throw new DbOptimisticLockingException(s"No rows were updated, optimistic lock clash? ${name}:${values}")
+      apply(values(id).asInstanceOf[Number].longValue())
+    } finally {
+      ps.close
+    }
+  }
+
+  @throws[DbOptimisticLockingException]("if the row has been updated after you read it")
   def update(values: Map[String, Any]): Row = inTransaction {
 
-    val minusVersion = values.filterNot { case (n: String, v) => version.equalsIgnoreCase(n) }
+    val minusVersion = values.filterNot {
+      case (n, _) => version.equalsIgnoreCase(n)
+    }
 
     val usingVersion = values.size == minusVersion.size + 1
 
@@ -39,22 +62,10 @@ class Table private[db] ( name: String,
       throw DbException(s"There are multiple 'version' fields in ${values}, cannot update ${name}")
     }
 
-    val params = minusVersion.map { case (k: String, v) => s"$k=?" }.mkString(",")
-
-    val (sql, p) = if (usingVersion) {
-      (s"UPDATE ${name} SET ${params}, version = version + 1 WHERE id = ? AND version = ?", minusVersion.values.toSeq :+ values(id) :+ values(version))
+    if (usingVersion) {
+      update(minusVersion, where(id -> values(id)) and where("version" -> values(version)), true)
     } else {
-      (s"UPDATE ${name} SET ${params} WHERE id = ?", minusVersion.values.toSeq :+ values(id))
-    }
-
-    val ps = prepareStatement(sql, p)
-
-    try {
-      val numRows = ps.executeUpdate()
-      if (usingVersion && numRows == 0) throw new DbOptimisticLockingException(s"No rows were updated, optimistic lock clash? ${name}:${values}")
-      apply(values(id).asInstanceOf[Number].longValue())
-    } finally {
-      ps.close
+      update(minusVersion, where(id -> values(id)))
     }
   }
 
