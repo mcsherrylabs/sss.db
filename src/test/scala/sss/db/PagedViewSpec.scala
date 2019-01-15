@@ -87,7 +87,7 @@ class PagedViewSpec extends DbSpecSetup {
   it should " respect the status column " in {
 
     (1 to 10) foreach { i => view2.insert(Map(idCol -> i, statusCol -> 0)) }
-    Seq(2,4,6,8) foreach { i => view2.update(Map(idCol -> i, statusCol -> 1)) }
+    Seq(2,4,6,8) foreach { i => view2.updateRow(Map(idCol -> i, statusCol -> 1)) }
 
     val pv = PagedView(view2, 2, where (statusCol -> 0), idCol)
     var page = pv.lastPage

@@ -24,41 +24,40 @@ class Table private[db] ( name: String,
     val ps = conn.createStatement()
     try {
       ps.execute(s"ALTER TABLE ${name} ALTER COLUMN id RESTART WITH ${next};")
-    } finally ps.close
+    } finally ps.close()
 
   }
 
   @throws[DbOptimisticLockingException]("if the row has been updated after you read it")
-  def update(values: Map[String, Any], where: Where, updateVersionCol: Boolean = false): Row = inTransaction {
+  def update(values: Map[String, Any], where: Where, updateVersionCol: Boolean = false): Unit = inTransaction {
 
-    val minusId = values - id
-
-    val params = minusId.keys.map (k => s"$k = ?").mkString(",")
+    val params = values.keys.map (k => s"$k = ?").mkString(",")
 
     val versionSql = if (updateVersionCol) ", version = version + 1" else ""
     val sql = s"UPDATE $name SET $params $versionSql ${where.sql}"
 
-    val ps = prepareStatement(sql, minusId.values.toSeq ++ where.params)
+    val ps = prepareStatement(sql, values.values.toSeq ++ where.params)
 
     try {
       val numRows = ps.executeUpdate()
       if (updateVersionCol && numRows == 0) throw new DbOptimisticLockingException(s"No rows were updated, optimistic lock clash? ${name}:${values}")
-      apply(values(id).asInstanceOf[Number].longValue())
     } finally {
-      ps.close
+      ps.close()
     }
   }
 
   @throws[DbOptimisticLockingException]("if the row has been updated after you read it")
-  def update(values: Map[String, Any]): Row = inTransaction {
+  def updateRow(values: Map[String, Any]): Row = inTransaction {
 
-    val minusVersion = values.filterNot {
+    val minusId = values - id
+
+    val minusVersion = minusId.filterNot {
       case (n, _) => version.equalsIgnoreCase(n)
     }
 
-    val usingVersion = values.size == minusVersion.size + 1
+    val usingVersion = minusId.size == minusVersion.size + 1
 
-    if (values.size - minusVersion.size > 1) {
+    if (minusId.size - minusVersion.size > 1) {
       throw DbException(s"There are multiple 'version' fields in ${values}, cannot update ${name}")
     }
 
@@ -67,6 +66,7 @@ class Table private[db] ( name: String,
     } else {
       update(minusVersion, where(id -> values(id)))
     }
+    apply(values(id).asInstanceOf[Number].longValue())
   }
 
   /**
@@ -90,7 +90,7 @@ class Table private[db] ( name: String,
       ks.next
       get(ks.getLong(1)).getOrElse(DbError(s"Could not retrieve generated id of row just written to ${name}"))
     } finally {
-      ps.close
+      ps.close()
     }
 
   }
@@ -120,7 +120,7 @@ class Table private[db] ( name: String,
     values.partition(kv => id.equalsIgnoreCase(kv._1)) match {
       case (mapWithId, rest) if(mapWithId.isEmpty)       => insert(rest)
       case (mapWithId, rest) if(mapWithId.head._2 == 0l) => insert(rest)
-      case _                                             => update(values)
+      case _                                             => updateRow(values)
     }
   }
 
@@ -152,7 +152,7 @@ class Table private[db] ( name: String,
       st.executeUpdate(sql); // run the query
 
     } finally {
-      st.close
+      st.close()
     }
   }
 
@@ -164,7 +164,7 @@ class Table private[db] ( name: String,
     try {
       ps.executeUpdate(); // run the query
     } finally {
-      ps.close
+      ps.close()
     }
   }
 
