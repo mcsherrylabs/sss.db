@@ -1,5 +1,6 @@
 package sss.db
 
+import java.io.InputStream
 import java.sql.PreparedStatement
 import java.util
 import java.util.Date
@@ -11,6 +12,7 @@ import sss.ancillary.Logging
 import scala.collection.mutable
 import scala.language.implicitConversions
 import scala.reflect.runtime.universe._
+
 
 /**
   *
@@ -51,6 +53,7 @@ class Query private[db] (private val selectSql: String,
       case v: scala.math.BigInt => v.bigInteger
       case v: Float => v
       case v: Enumeration#Value => v.id
+      case v: InputStream => v
       case v => DbError(s"Can't turn ${value} ${value.getClass} into sql value..")
     }
   }

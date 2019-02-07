@@ -71,7 +71,7 @@ trait Tx extends Logging {
 
   def validateTx[T](isolationLevel: Option[Int] = None)(f: => T): Try[T] = Try {
 
-    val txStarted = isolationLevel map (startTx(_)) getOrElse (startTx())
+    val txStarted = isolationLevel map startTx getOrElse startTx()
 
     require(txStarted, "Must validate in standalone tx")
 
@@ -110,7 +110,7 @@ trait Tx extends Logging {
 
         case Failure(e) =>
 
-          conn.rollback
+          conn.rollback()
           closeTx
           Failure(e)
       }
