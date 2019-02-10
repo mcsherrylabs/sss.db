@@ -1,16 +1,19 @@
 package sss.db
 
+
 import com.twitter.util.SynchronizedLruMap
 import com.typesafe.config.Config
 import sss.ancillary.{DynConfig, Logging}
 import sss.db.datasource.DataSource
 import sss.db.datasource.DataSource._
 
+
 import scala.language.dynamics
+
 
 object Db {
 
-  def apply(dbConfig: DbConfig)(ds:CloseableDataSource) = {
+  def apply(dbConfig: DbConfig)(ds:CloseableDataSource): Db = {
     new Db(dbConfig)(ds)
   }
 
@@ -63,6 +66,7 @@ class Db(dbConfig: DbConfig)(private[db] val ds:CloseableDataSource) extends Log
   def createView(createViewSql: String) = executeSql(createViewSql)
 
   def select(sql: String): Query = new Query(sql, ds, dbConfig.freeBlobsEarly)
+
 
   def shutdown = {
     executeSql("SHUTDOWN")

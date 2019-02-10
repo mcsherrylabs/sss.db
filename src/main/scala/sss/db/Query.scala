@@ -2,13 +2,14 @@ package sss.db
 
 import java.io.InputStream
 import java.sql.PreparedStatement
-import java.util
+
 import java.util.Date
 
 import javax.sql.DataSource
 import org.joda.time.LocalDate
 import sss.ancillary.Logging
 
+import scala.collection.generic.FilterMonadic
 import scala.collection.mutable
 import scala.language.implicitConversions
 import scala.reflect.runtime.universe._
@@ -25,6 +26,7 @@ import scala.reflect.runtime.universe._
   * can recover from is not by (my) definition an Exception!
   *
   */
+
 class Query private[db] (private val selectSql: String,
             private[db] val ds: DataSource,
             freeBlobsEarly: Boolean)
@@ -89,6 +91,7 @@ class Query private[db] (private val selectSql: String,
     }
   }
 
+
   def getRow(rowId: Long): Option[Row] = getRow(where(id -> rowId))
 
   def map[B, W <% Where](f: Row => B, where: W = where()): QueryResults[B] = filter(where).map(f)
@@ -99,7 +102,7 @@ class Query private[db] (private val selectSql: String,
       .toIndexedSeq
   }
 
-  def withFilter(f: Row => Boolean) = map(identity).withFilter(f)
+  def withFilter(f: Row => Boolean): FilterMonadic[Row,QueryResults[Row]] = map(identity).withFilter(f)
 
   def foreach[W <% Where](f: Row => Unit, where: W = where()): Unit = map(f, where)
 
