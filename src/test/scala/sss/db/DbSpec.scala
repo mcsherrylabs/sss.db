@@ -5,15 +5,7 @@ import org.scalatest.{BeforeAndAfterAll, SequentialNestedSuiteExecution, Suites}
 
 class DbSpec extends
   Suites(
-      new DbV1Spec,
-      new DbV2Spec,
-      new BlobStoreSpec,
-      new PagedViewSpec,
-      new ForComprehensionSpec,
-      new SqlInterpolatorSpec,
-      new ParallelThreadSupportSpec,
-      new ValidateTransactionSpec,
-      new SetIsolationLevelSupportSpec
+      new DbV1Spec
   ) with
   BeforeAndAfterAll with
   SequentialNestedSuiteExecution {

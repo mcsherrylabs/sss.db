@@ -4,6 +4,8 @@ import java.sql.Statement
 
 import javax.sql.DataSource
 
+import scala.concurrent.Future
+
 class Table private[db] ( name: String,
              ds: DataSource,
              freeBlobsEarly: Boolean,
@@ -15,39 +17,42 @@ class Table private[db] ( name: String,
     freeBlobsEarly,
     columns) {
 
-  def setNextIdToMaxIdPlusOne(): Unit = inTransaction {
-    setNextId(maxId() + 1)
+  def setNextIdToMaxIdPlusOne(): Transaction[Unit] = {
+    maxId().map(max => setNextId(max + 1))
   }
 
-  def setNextId(next: Long): Unit = {
+  def setNextId(next: Long): Transaction[Boolean] = { context =>
+    Future {
 
-    val ps = conn.createStatement()
-    try {
-      ps.execute(s"ALTER TABLE ${name} ALTER COLUMN id RESTART WITH ${next};")
-    } finally ps.close()
+      val ps = context.conn.createStatement()
+      try {
+        ps.execute(s"ALTER TABLE ${name} ALTER COLUMN id RESTART WITH ${next};")
+      } finally ps.close()
 
+    }(context.ec)
   }
 
   @throws[DbOptimisticLockingException]("if the row has been updated after you read it")
-  def update(values: Map[String, Any], where: Where, updateVersionCol: Boolean = false): Unit = inTransaction {
+  def update(values: Map[String, Any], where: Where, updateVersionCol: Boolean = false): Transaction[Unit] = {
 
-    val params = values.keys.map (k => s"$k = ?").mkString(",")
+    val params = values.keys.map(k => s"$k = ?").mkString(",")
 
     val versionSql = if (updateVersionCol) ", version = version + 1" else ""
     val sql = s"UPDATE $name SET $params $versionSql ${where.sql}"
 
-    val ps = prepareStatement(sql, values.values.toSeq ++ where.params)
+    prepareStatement(sql, values.values.toSeq ++ where.params).map { ps =>
 
-    try {
-      val numRows = ps.executeUpdate()
-      if (updateVersionCol && numRows == 0) throw new DbOptimisticLockingException(s"No rows were updated, optimistic lock clash? ${name}:${values}")
-    } finally {
-      ps.close()
+      try {
+        val numRows = ps.executeUpdate()
+        if (updateVersionCol && numRows == 0) throw new DbOptimisticLockingException(s"No rows were updated, optimistic lock clash? ${name}:${values}")
+      } finally {
+        ps.close()
+      }
     }
   }
 
   @throws[DbOptimisticLockingException]("if the row has been updated after you read it")
-  def updateRow(values: Map[String, Any]): Row = inTransaction {
+  def updateRow(values: Map[String, Any]): Transaction[Row] =  {
 
     val minusId = values - id
 
@@ -77,22 +82,22 @@ class Table private[db] ( name: String,
     * @param values
     * @return
     */
-  def insert(values: Map[String, Any]): Row = inTransaction {
+  def insert(values: Map[String, Any]): Transaction[Row] = {
 
     val names = values.keys.mkString(",")
     val params = (0 until values.keys.size).map(x => "?").mkString(",")
 
     val sql = s"INSERT INTO ${name} (${names}) VALUES ( ${params})"
-    val ps = prepareStatement(sql, values.values.toSeq, Some(Statement.RETURN_GENERATED_KEYS))
-    try {
-      ps.executeUpdate() // run the query
-      val ks = ps.getGeneratedKeys
-      ks.next
-      get(ks.getLong(1)).getOrElse(DbError(s"Could not retrieve generated id of row just written to ${name}"))
-    } finally {
-      ps.close()
+    prepareStatement(sql, values.values.toSeq, Some(Statement.RETURN_GENERATED_KEYS)).flatMap { ps =>
+      try {
+        ps.executeUpdate() // run the query
+        val ks = ps.getGeneratedKeys
+        ks.next
+        get(ks.getLong(1)).map(_.getOrElse(DbError(s"Could not retrieve generated id of row just written to ${name}")))
+      } finally {
+        ps.close()
+      }
     }
-
   }
 
   /**
@@ -115,7 +120,7 @@ class Table private[db] ( name: String,
     * @param values
     * @return
     */
-  def persist(values: Map[String, Any]): Row = inTransaction {
+  def persist(values: Map[String, Any]): Transaction[Row] = {
 
     values.partition(kv => id.equalsIgnoreCase(kv._1)) match {
       case (mapWithId, rest) if(mapWithId.isEmpty)       => insert(rest)
@@ -124,13 +129,14 @@ class Table private[db] ( name: String,
     }
   }
 
-  def delete(where: Where): Int = tx[Int] {
+  def delete(where: Where): Transaction[Int] = {
 
-    val ps = prepareStatement(s"DELETE FROM $name ${where.sql}", where.params)
-    try {
-      ps.executeUpdate(); // run the query
-    } finally {
-      ps.close()
+    prepareStatement(s"DELETE FROM $name ${where.sql}", where.params) map { ps =>
+      try {
+        ps.executeUpdate(); // run the query
+      } finally {
+        ps.close()
+      }
     }
   }
 
@@ -143,28 +149,31 @@ class Table private[db] ( name: String,
     * @note This is a gateway for sql injection attacks, Use update(Map[]) if possible.
     * @example update("count = count + 1", "id = 1")
     */
-  def update(values: String, filter: String): Int = tx {
+  def update(values: String, filter: String): Transaction[Int] = { context =>
+    Future {
 
-    val st = conn.createStatement(); // statement objects can be reused with
-    try {
+      val st = context.conn.createStatement() // statement objects can be reused with
+      try {
 
-      val sql = s"UPDATE ${name} SET ${values} WHERE ${filter}"
-      st.executeUpdate(sql); // run the query
+        val sql = s"UPDATE ${name} SET ${values} WHERE ${filter}"
+        st.executeUpdate(sql); // run the query
 
-    } finally {
-      st.close()
-    }
+      } finally {
+        st.close()
+      }
+    }(context.ec)
   }
 
-  def insert(values: Any*): Int = tx {
+  def insert(values: Any*): Transaction[Int] = {
 
     val params = (0 until values.size).map(x => "?").mkString(",")
     val sql = s"INSERT INTO ${name} VALUES ( ${params})"
-    val ps = prepareStatement(sql, values.toSeq, Some(Statement.RETURN_GENERATED_KEYS))
-    try {
-      ps.executeUpdate(); // run the query
-    } finally {
-      ps.close()
+    prepareStatement(sql, values.toSeq, Some(Statement.RETURN_GENERATED_KEYS)) map { ps =>
+      try {
+        ps.executeUpdate() // run the query
+      } finally {
+        ps.close()
+      }
     }
   }
 

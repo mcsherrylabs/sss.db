@@ -5,11 +5,18 @@ import java.math.BigDecimal
 import java.sql.Blob
 import java.util.regex.Pattern
 
+import javax.sql.DataSource
 import sss.db.NullOrder.NullOrder
 
 import scala.collection.mutable
 import scala.collection.mutable.WrappedArray
+import scala.concurrent.duration.Duration
+import scala.concurrent.{ExecutionContext, Future}
 import scala.language.implicitConversions
+import scala.util.{Failure, Success, Try}
+
+import sss.ancillary.FutureOps._
+
 /**
  * @author alan
  */
@@ -51,6 +58,42 @@ package object db {
 
   type ColumnTypes = SimpleColumnTypes with Option[SimpleColumnTypes]
 
+
+
+  implicit class RunOp[T](val t:Transaction[T]) extends AnyVal {
+    def run(implicit d: DataSource, ec: ExecutionContext): Future[T] = {
+      val c = d.getConnection
+      Try {
+        t(TransactionContext(c, ec))
+      } match {
+        case Failure(e) =>
+          c.rollback()
+          c.close()
+          throw e
+        case Success(result) =>
+          c.close()
+          result
+      }
+    }
+  }
+
+  implicit class RunSyncOp[T](val t:Transaction[T]) extends AnyVal {
+    def runSync(implicit d: DataSource): Try[T] = {
+      val c = d.getConnection
+
+      Try {
+        t(TransactionContext(c, ExecutionContextHelper.synchronousExecutionContext))
+      } match {
+        case Failure(e) =>
+          c.rollback()
+          c.close()
+          throw e
+        case Success(result) =>
+          c.close()
+          result.toTry()
+      }
+    }
+  }
 
   implicit class SqlHelper(val sc: StringContext) extends AnyVal {
     def ps(args: Any*): (String, Seq[Any]) = {

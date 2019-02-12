@@ -3,12 +3,12 @@ package sss.db
 
 import com.twitter.util.SynchronizedLruMap
 import com.typesafe.config.Config
+import javax.sql.{DataSource => SqlDataSource}
 import sss.ancillary.{DynConfig, Logging}
 import sss.db.datasource.DataSource
 import sss.db.datasource.DataSource._
 
-
-import scala.language.dynamics
+import scala.concurrent.Future
 
 
 object Db {
@@ -34,16 +34,16 @@ trait DbConfig {
   val createSqlOpt: Option[java.lang.Iterable[String]]
 }
 
-class Db(dbConfig: DbConfig)(private[db] val ds:CloseableDataSource) extends Logging with Dynamic with Tx {
+class Db(dbConfig: DbConfig)(closeableDataSource:CloseableDataSource) extends Logging {
 
   private lazy val viewCache  = new SynchronizedLruMap[String, View](dbConfig.viewCachesSize)
   private lazy val tableCache = new SynchronizedLruMap[String, Table](dbConfig.viewCachesSize)
 
+  implicit val ds: SqlDataSource = closeableDataSource
+
   if(dbConfig.useShutdownHook) sys addShutdownHook shutdown
 
-  DbInitialSqlExecutor(dbConfig: DbConfig, executeSql _)
-
-  def selectDynamic(tableName: String) = table(tableName)
+  DbInitialSqlExecutor(dbConfig: DbConfig, executeSql _)(ds)
 
   def table(name: String): Table =  tableCache.getOrElseUpdate(name, new Table(name, ds, dbConfig.freeBlobsEarly))
 
@@ -61,16 +61,15 @@ class Db(dbConfig: DbConfig)(private[db] val ds:CloseableDataSource) extends Log
    */
   def view(name: String): View = viewCache.getOrElseUpdate(name, new View(name, ds, dbConfig.freeBlobsEarly))
 
-  def dropView(viewName: String) = executeSql(s"DROP VIEW ${viewName}")
+  def dropView(viewName: String): Transaction[Int] = executeSql(s"DROP VIEW ${viewName}")
 
-  def createView(createViewSql: String) = executeSql(createViewSql)
+  def createView(createViewSql: String): Transaction[Int] = executeSql(createViewSql)
 
   def select(sql: String): Query = new Query(sql, ds, dbConfig.freeBlobsEarly)
 
 
   def shutdown = {
-    executeSql("SHUTDOWN")
-    ds.close
+    executeSql("SHUTDOWN") map (_ => closeableDataSource.close())
   }
 
   /**
@@ -80,7 +79,11 @@ class Db(dbConfig: DbConfig)(private[db] val ds:CloseableDataSource) extends Log
     * @return
     * @note This is a gateway for sql injection attacks, use with extreme caution.
     */
-  def executeSqls(sqls: Seq[String]): Seq[Int] = inTransaction(sqls.map(executeSql(_)))
+  def executeSqls(sqls: Seq[String]): Transaction[Seq[Int]] = {
+    sqls.foldLeft(Transaction.unit(Seq.empty[Int])) {
+      (acc,e) => acc.flatMap(seqInt => executeSql(e).map(i => seqInt :+ i))
+    }
+  }
 
   /**
     * Execute any sql you give it on a db connection in a transaction
@@ -89,10 +92,10 @@ class Db(dbConfig: DbConfig)(private[db] val ds:CloseableDataSource) extends Log
     * @return
     * @note This is a gateway for sql injection attacks, use with extreme caution.
     */
-  def executeSql(sql: String):Int = inTransaction {
-    val st = conn.createStatement()
+  def executeSql(sql: String):Transaction[Int] = { context =>
+    val st = context.conn.createStatement()
     try {
-      st.executeUpdate(sql)
+      Future(st.executeUpdate(sql))(context.ec)
     } finally st.close
   }
 

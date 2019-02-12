@@ -15,7 +15,7 @@ trait Page {
     * An enclosing tx may be necessary if the rows contain Blobs, and early blob freeing is not
     * true. In this case, the blobs are only guaranteed to live until the tx is closed.
     */
-  def tx[T](f: => T): T
+
 }
 
 private case class PageImpl private (indexCol: String,
@@ -24,12 +24,13 @@ private case class PageImpl private (indexCol: String,
                                      pageSize: Int,
                                      filter: Where) extends Page {
 
-  require(!rows.isEmpty, "The EmptyPage handles no row situations.")
+  require(rows.nonEmpty, "The EmptyPage handles no row situations.")
+
+  import view.ds
 
   private val firstIndexInPage = rows.head[Number](indexCol).longValue
   private val lastIndexInPage = rows.last[Number](indexCol).longValue
 
-  override def tx[T](f: => T): T = view.tx[T](f)
 
   lazy override val next: Page =
     if(hasNext) PageImpl(indexCol, view, nextRows, pageSize, filter)
@@ -47,12 +48,12 @@ private case class PageImpl private (indexCol: String,
   private lazy val nextRows = view.filter(
     where (s"$indexCol > ?", lastIndexInPage) and filter
       orderBy OrderAsc(indexCol)
-      limit pageSize)
+      limit pageSize).run
 
   private lazy val prevRows = view.filter(
     where (s"$indexCol < ?", firstIndexInPage) and filter
       orderBy OrderDesc(indexCol)
-      limit pageSize)
+      limit pageSize).run
 
 }
 
@@ -62,12 +63,12 @@ case class EmptyPage(pagedView: PagedView) extends Page {
   lazy override val prev: Page = pagedView.firstPage
   override val hasPrev: Boolean = false
   override val hasNext: Boolean = false
-  def tx[T](f: => T) = pagedView.tx(f)
+
 }
 
 object PagedView {
 
-  def apply(view:Query, pageSize: Int, filter: Where = where(), indexCol: String = "id") = {
+  def apply(view:Query, pageSize: Int, filter: Where = where(), indexCol: String = "id"): PagedView = {
     new PagedView(view, pageSize, filter, indexCol)
   }
 
@@ -106,7 +107,7 @@ class PagedView private ( view:Query,
     * An enclosing tx may be necessary if the rows contain Blobs, and early blob freeing is not
     * true. In this case, the blobs are only guaranteed to live until the tx is closed.
     */
-  def tx[T](f: => T): T = view.tx[T](f)
+  import view.ds
 
   override def iterator: Iterator[Rows] = new ToIterator(this).toIterator
 
@@ -115,7 +116,7 @@ class PagedView private ( view:Query,
     val rows = view.filter(
       filter
         orderBy OrderDesc(indexCol)
-        limit pageSize)
+        limit pageSize).run
 
     if(rows.isEmpty) EmptyPage(this)
     else PageImpl(indexCol, view, rows.reverse, pageSize, filter)
@@ -125,7 +126,7 @@ class PagedView private ( view:Query,
     val rows = view.filter(
       filter
         orderBy OrderAsc(indexCol)
-        limit pageSize)
+        limit pageSize).run
 
     if(rows.isEmpty) EmptyPage(this)
     else PageImpl(indexCol, view, rows, pageSize, filter)
