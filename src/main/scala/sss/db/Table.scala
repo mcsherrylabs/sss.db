@@ -2,27 +2,23 @@ package sss.db
 
 import java.sql.Statement
 
-import javax.sql.DataSource
-
-import scala.concurrent.Future
-
-class Table private[db] ( name: String,
-             ds: DataSource,
-             freeBlobsEarly: Boolean,
-             columns: String = "*")
+class Table private[db] (name: String,
+                         runContext: RunContext,
+                         freeBlobsEarly: Boolean,
+                         columns: String = "*")
 
   extends View(
     name,
-    ds,
+    runContext,
     freeBlobsEarly,
     columns) {
 
-  def setNextIdToMaxIdPlusOne(): Transaction[Unit] = {
+  def setNextIdToMaxIdPlusOne(): FutureTx[Unit] = {
     maxId().map(max => setNextId(max + 1))
   }
 
-  def setNextId(next: Long): Transaction[Boolean] = { context =>
-    Future {
+  def setNextId(next: Long): FutureTx[Boolean] = { context =>
+    LoggingFuture {
 
       val ps = context.conn.createStatement()
       try {
@@ -33,7 +29,7 @@ class Table private[db] ( name: String,
   }
 
   @throws[DbOptimisticLockingException]("if the row has been updated after you read it")
-  def update(values: Map[String, Any], where: Where, updateVersionCol: Boolean = false): Transaction[Unit] = {
+  def update(values: Map[String, Any], where: Where, updateVersionCol: Boolean = false): FutureTx[Unit] = {
 
     val params = values.keys.map(k => s"$k = ?").mkString(",")
 
@@ -52,7 +48,7 @@ class Table private[db] ( name: String,
   }
 
   @throws[DbOptimisticLockingException]("if the row has been updated after you read it")
-  def updateRow(values: Map[String, Any]): Transaction[Row] =  {
+  def updateRow(values: Map[String, Any]): FutureTx[Row] =  {
 
     val minusId = values - id
 
@@ -82,7 +78,7 @@ class Table private[db] ( name: String,
     * @param values
     * @return
     */
-  def insert(values: Map[String, Any]): Transaction[Row] = {
+  def insert(values: Map[String, Any]): FutureTx[Row] = {
 
     val names = values.keys.mkString(",")
     val params = (0 until values.keys.size).map(x => "?").mkString(",")
@@ -120,7 +116,7 @@ class Table private[db] ( name: String,
     * @param values
     * @return
     */
-  def persist(values: Map[String, Any]): Transaction[Row] = {
+  def persist(values: Map[String, Any]): FutureTx[Row] = {
 
     values.partition(kv => id.equalsIgnoreCase(kv._1)) match {
       case (mapWithId, rest) if(mapWithId.isEmpty)       => insert(rest)
@@ -129,7 +125,7 @@ class Table private[db] ( name: String,
     }
   }
 
-  def delete(where: Where): Transaction[Int] = {
+  def delete(where: Where): FutureTx[Int] = {
 
     prepareStatement(s"DELETE FROM $name ${where.sql}", where.params) map { ps =>
       try {
@@ -149,8 +145,8 @@ class Table private[db] ( name: String,
     * @note This is a gateway for sql injection attacks, Use update(Map[]) if possible.
     * @example update("count = count + 1", "id = 1")
     */
-  def update(values: String, filter: String): Transaction[Int] = { context =>
-    Future {
+  def update(values: String, filter: String): FutureTx[Int] = { context =>
+    LoggingFuture {
 
       val st = context.conn.createStatement() // statement objects can be reused with
       try {
@@ -164,7 +160,7 @@ class Table private[db] ( name: String,
     }(context.ec)
   }
 
-  def insert(values: Any*): Transaction[Int] = {
+  def insert(values: Any*): FutureTx[Int] = {
 
     val params = (0 until values.size).map(x => "?").mkString(",")
     val sql = s"INSERT INTO ${name} VALUES ( ${params})"

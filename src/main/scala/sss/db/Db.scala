@@ -3,26 +3,29 @@ package sss.db
 
 import com.twitter.util.SynchronizedLruMap
 import com.typesafe.config.Config
-import javax.sql.{DataSource => SqlDataSource}
-import sss.ancillary.{DynConfig, Logging}
+import sss.ancillary.{DynConfig, Logging, LoggingFutureSupport}
 import sss.db.datasource.DataSource
 import sss.db.datasource.DataSource._
 
-import scala.concurrent.Future
+import scala.concurrent.ExecutionContext
 
 
 object Db {
 
-  def apply(dbConfig: DbConfig)(ds:CloseableDataSource): Db = {
-    new Db(dbConfig)(ds)
+  def apply(dbConfig: DbConfig)(ds:CloseableDataSource,
+                                executionContext: ExecutionContext): Db = {
+    new Db(dbConfig)(ds, executionContext)
   }
 
-  def apply(dbConfig: Config)(ds:CloseableDataSource): Db = {
-    apply(DynConfig[DbConfig](dbConfig))(ds)
+  def apply(dbConfig: Config)(ds:CloseableDataSource,
+                              executionContext: ExecutionContext): Db = {
+    apply(DynConfig[DbConfig](dbConfig))(ds, executionContext)
   }
 
-  def apply(dbConfigName: String = "database", ds:CloseableDataSource = DataSource()): Db = {
-    apply(DynConfig[DbConfig](dbConfigName))(ds)
+  def apply(dbConfigName: String = "database",
+            ds:CloseableDataSource = DataSource(),
+            executionContext: ExecutionContext = ExecutionContextHelper.ioExecutionContext): Db = {
+    apply(DynConfig[DbConfig](dbConfigName))(ds, executionContext)
   }
 }
 
@@ -34,18 +37,20 @@ trait DbConfig {
   val createSqlOpt: Option[java.lang.Iterable[String]]
 }
 
-class Db(dbConfig: DbConfig)(closeableDataSource:CloseableDataSource) extends Logging {
+class Db(dbConfig: DbConfig)(closeableDataSource:CloseableDataSource, ec: ExecutionContext)
+  extends Logging
+    with LoggingFutureSupport{
 
   private lazy val viewCache  = new SynchronizedLruMap[String, View](dbConfig.viewCachesSize)
   private lazy val tableCache = new SynchronizedLruMap[String, Table](dbConfig.viewCachesSize)
 
-  implicit val ds: SqlDataSource = closeableDataSource
+  implicit val runContext: RunContext = new RunContext(closeableDataSource, ec)
 
   if(dbConfig.useShutdownHook) sys addShutdownHook shutdown
 
-  DbInitialSqlExecutor(dbConfig: DbConfig, executeSql _)(ds)
+  DbInitialSqlExecutor(dbConfig: DbConfig, executeSql _)(closeableDataSource)
 
-  def table(name: String): Table =  tableCache.getOrElseUpdate(name, new Table(name, ds, dbConfig.freeBlobsEarly))
+  def table(name: String): Table =  tableCache.getOrElseUpdate(name, new Table(name, runContext, dbConfig.freeBlobsEarly))
 
   /*
   Views - they're great!
@@ -59,13 +64,13 @@ class Db(dbConfig: DbConfig)(closeableDataSource:CloseableDataSource) extends Lo
 
   TL;DR for blockchain type applications views are a good solution.
    */
-  def view(name: String): View = viewCache.getOrElseUpdate(name, new View(name, ds, dbConfig.freeBlobsEarly))
+  def view(name: String): View = viewCache.getOrElseUpdate(name, new View(name, runContext, dbConfig.freeBlobsEarly))
 
-  def dropView(viewName: String): Transaction[Int] = executeSql(s"DROP VIEW ${viewName}")
+  def dropView(viewName: String): FutureTx[Int] = executeSql(s"DROP VIEW ${viewName}")
 
-  def createView(createViewSql: String): Transaction[Int] = executeSql(createViewSql)
+  def createView(createViewSql: String): FutureTx[Int] = executeSql(createViewSql)
 
-  def select(sql: String): Query = new Query(sql, ds, dbConfig.freeBlobsEarly)
+  def select(sql: String): Query = new Query(sql, runContext, dbConfig.freeBlobsEarly)
 
 
   def shutdown = {
@@ -79,8 +84,8 @@ class Db(dbConfig: DbConfig)(closeableDataSource:CloseableDataSource) extends Lo
     * @return
     * @note This is a gateway for sql injection attacks, use with extreme caution.
     */
-  def executeSqls(sqls: Seq[String]): Transaction[Seq[Int]] = {
-    sqls.foldLeft(Transaction.unit(Seq.empty[Int])) {
+  def executeSqls(sqls: Seq[String]): FutureTx[Seq[Int]] = {
+    sqls.foldLeft(FutureTx.unit(Seq.empty[Int])) {
       (acc,e) => acc.flatMap(seqInt => executeSql(e).map(i => seqInt :+ i))
     }
   }
@@ -92,10 +97,10 @@ class Db(dbConfig: DbConfig)(closeableDataSource:CloseableDataSource) extends Lo
     * @return
     * @note This is a gateway for sql injection attacks, use with extreme caution.
     */
-  def executeSql(sql: String):Transaction[Int] = { context =>
+  def executeSql(sql: String):FutureTx[Int] = { context =>
     val st = context.conn.createStatement()
     try {
-      Future(st.executeUpdate(sql))(context.ec)
+      LoggingFuture(st.executeUpdate(sql))(context.ec)
     } finally st.close
   }
 

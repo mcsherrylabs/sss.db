@@ -1,15 +1,14 @@
 package sss.db
 
-import javax.sql.DataSource
+
 import sss.ancillary.Logging
 
-import scala.concurrent.Future
 import scala.language.implicitConversions
 
 /**
   *
   * @param name
-  * @param ds
+  * @param runContext
   * @param freeBlobsEarly
   *
   * Note on idomatic try/finally. 'Try' doesn't add much here as I want to close the resource and
@@ -18,16 +17,16 @@ import scala.language.implicitConversions
   *
   */
 class View private[db] (val name: String,
-           ds: DataSource,
-           freeBlobsEarly: Boolean,
-           columns: String = "*")
-  extends Query(s"SELECT ${columns} from ${name}", ds, freeBlobsEarly)  with Logging {
+                        runContext: RunContext,
+                        freeBlobsEarly: Boolean,
+                        columns: String = "*")
+  extends Query(s"SELECT ${columns} from ${name}", runContext, freeBlobsEarly)  with Logging {
 
 
-  def maxId(): Transaction[Long] = max(id)
+  def maxId(): FutureTx[Long] = max(id)
 
-  def max(colName: String): Transaction[Long] = { context =>
-    Future {
+  def max(colName: String): FutureTx[Long] = { context =>
+    LoggingFuture {
       val st = context.conn.createStatement() // statement objects can be reused with
       try {
         val rs = st.executeQuery(s"SELECT MAX($colName) AS max_val FROM ${name}")
@@ -40,8 +39,8 @@ class View private[db] (val name: String,
   }
 
 
-  def count: Transaction[Long] = { context =>
-    Future {
+  def count: FutureTx[Long] = { context =>
+    LoggingFuture {
       val st = context.conn.createStatement() // statement objects can be reused with
       try {
         val rs = st.executeQuery(s"SELECT COUNT(*) AS total FROM ${name}")

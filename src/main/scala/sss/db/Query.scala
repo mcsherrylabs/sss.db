@@ -4,14 +4,11 @@ import java.io.InputStream
 import java.sql.PreparedStatement
 import java.util.Date
 
-import javax.sql.DataSource
 import org.joda.time.LocalDate
-import sss.ancillary.Logging
-import sss.db.datasource.DataSource.CloseableDataSource
+import sss.ancillary.{Logging, LoggingFutureSupport}
 
 import scala.collection.generic.FilterMonadic
 import scala.collection.mutable
-import scala.concurrent.Future
 import scala.language.implicitConversions
 import scala.reflect.runtime.universe._
 
@@ -29,9 +26,10 @@ import scala.reflect.runtime.universe._
   */
 
 class Query private[db] (private val selectSql: String,
-                         implicit val ds: DataSource,
+                         implicit val runContext: RunContext,
             freeBlobsEarly: Boolean)
-  extends Logging {
+  extends Logging
+    with LoggingFutureSupport{
 
   protected val id = "id"
   protected val version = "version"
@@ -63,8 +61,8 @@ class Query private[db] (private val selectSql: String,
   private[db] def prepareStatement(
                                     sql: String,
                                     params: Seq[Any],
-                                    flags: Option[Int] = None): Transaction[PreparedStatement] = { context =>
-    Future {
+                                    flags: Option[Int] = None): FutureTx[PreparedStatement] = { context =>
+    LoggingFuture {
       val ps = flags match {
         case None => context.conn.prepareStatement(s"${sql}")
         case Some(flgs) => context.conn.prepareStatement(s"${sql}", flgs)
@@ -86,7 +84,7 @@ class Query private[db] (private val selectSql: String,
     * @param sql
     * @return
     */
-  def getRow(sql: Where): Transaction[Option[Row]] = {
+  def getRow(sql: Where): FutureTx[Option[Row]] = {
 
     filter(sql) map { rows =>
 
@@ -99,20 +97,20 @@ class Query private[db] (private val selectSql: String,
   }
 
 
-  def getRow(rowId: Long): Transaction[Option[Row]] = getRow(where(id -> rowId))
+  def getRow(rowId: Long): FutureTx[Option[Row]] = getRow(where(id -> rowId))
 
-  def map[B, W <% Where](f: Row => B, where: W = where()): Transaction[QueryResults[B]] = filter(where).map(_ map f)
+  def map[B, W <% Where](f: Row => B, where: W = where()): FutureTx[QueryResults[B]] = filter(where).map(_ map f)
 
-  def flatMap[B, W <% Where](f: Row => QueryResults[B], where: W = where()): Transaction[QueryResults[B]] = {
+  def flatMap[B, W <% Where](f: Row => QueryResults[B], where: W = where()): FutureTx[QueryResults[B]] = {
     map(identity, where)
       .map(
       _.foldLeft(List[B]())((acc,e) => acc ++ f(e))
       .toIndexedSeq)
   }
 
-  def withFilter(f: Row => Boolean): Transaction[FilterMonadic[Row,QueryResults[Row]]] = map(identity).map(_.withFilter(f))
+  def withFilter(f: Row => Boolean): FutureTx[FilterMonadic[Row,QueryResults[Row]]] = map(identity).map(_.withFilter(f))
 
-  def foreach[W <% Where](f: Row => Unit, where: W = where()): Transaction[QueryResults[Unit]] = map(f, where)
+  def foreach[W <% Where](f: Row => Unit, where: W = where()): FutureTx[QueryResults[Unit]] = map(f, where)
 
   /**
     * Note - You can put ORDER BY into the Where clause ...
@@ -120,7 +118,7 @@ class Query private[db] (private val selectSql: String,
     * @param where
     * @return
     */
-  def filter(where: Where): Transaction[Rows] = {
+  def filter(where: Where): FutureTx[Rows] = {
 
     prepareStatement(s"${selectSql} ${where.sql}", where.params) map { ps =>
       try {
@@ -130,13 +128,13 @@ class Query private[db] (private val selectSql: String,
     }
   }
 
-  def filter(lookup: (String, Any)*): Transaction[Rows] = filter(tuplesToWhere(lookup: _*))
+  def filter(lookup: (String, Any)*): FutureTx[Rows] = filter(tuplesToWhere(lookup: _*))
 
-  def find(lookup: (String, Any)*): Transaction[Option[Row]] = find(tuplesToWhere(lookup: _*))
+  def find(lookup: (String, Any)*): FutureTx[Option[Row]] = find(tuplesToWhere(lookup: _*))
 
-  def find(sql: Where): Transaction[Option[Row]] = getRow(sql)
+  def find(sql: Where): FutureTx[Option[Row]] = getRow(sql)
 
-  def apply(id: Long): Transaction[Row] = getRow(id).map(_.getOrElse(DbException(s"No row with id ${id}")))
+  def apply(id: Long): FutureTx[Row] = getRow(id).map(_.getOrElse(DbException(s"No row with id ${id}")))
 
   /**
     * Shorthand way of getting the id from a row
@@ -149,27 +147,27 @@ class Query private[db] (private val selectSql: String,
     * @return
     */
 
-  def toIdOpt[T >: Long with Int: TypeTag](lookup: (String, Any)*): Transaction[Option[T]] =
+  def toIdOpt[T >: Long with Int: TypeTag](lookup: (String, Any)*): FutureTx[Option[T]] =
     find(lookup: _*).map(_.map(_[T](id)))
 
-  def toId[T >: Long with Int: TypeTag](lookup: (String, Any)*): Transaction[T] =
+  def toId[T >: Long with Int: TypeTag](lookup: (String, Any)*): FutureTx[T] =
     toIdOpt[T](lookup: _*).map(_.get)
 
-  def toIds[T >: Long with Int: TypeTag](lookup: (String, Any)*): Transaction[Seq[T]] =
+  def toIds[T >: Long with Int: TypeTag](lookup: (String, Any)*): FutureTx[Seq[T]] =
     filter(lookup: _*).map(_.map(_[T](id)))
 
-  def toIntId(lookup: (String, Any)*): Transaction[Int] = toId[Int](lookup: _*)
-  def toIntIdOpt(lookup: (String, Any)*): Transaction[Option[Int]] = toIdOpt[Int](lookup:_*)
-  def toIntIds(lookup: (String, Any)*): Transaction[Seq[Int]] = toIds[Int](lookup:_*)
+  def toIntId(lookup: (String, Any)*): FutureTx[Int] = toId[Int](lookup: _*)
+  def toIntIdOpt(lookup: (String, Any)*): FutureTx[Option[Int]] = toIdOpt[Int](lookup:_*)
+  def toIntIds(lookup: (String, Any)*): FutureTx[Seq[Int]] = toIds[Int](lookup:_*)
 
-  def toLongId(lookup:(String, Any)*): Transaction[Long] = toId[Long](lookup:_*)
-  def toLongIdOpt(lookup:(String, Any)*): Transaction[Option[Long]] = toIdOpt[Long](lookup:_*)
-  def toLongIds(lookup:(String, Any)*): Transaction[Seq[Long]] = toIds[Long](lookup:_*)
+  def toLongId(lookup:(String, Any)*): FutureTx[Long] = toId[Long](lookup:_*)
+  def toLongIdOpt(lookup:(String, Any)*): FutureTx[Option[Long]] = toIdOpt[Long](lookup:_*)
+  def toLongIds(lookup:(String, Any)*): FutureTx[Seq[Long]] = toIds[Long](lookup:_*)
 
-  def get(id: Long): Transaction[Option[Row]] = getRow(id)
+  def get(id: Long): FutureTx[Option[Row]] = getRow(id)
 
-  def page(start: Long, pageSize: Int, orderClauses: Seq[OrderBy] = Seq(OrderAsc("id"))): Transaction[Rows] = { context =>
-    Future {
+  def page(start: Long, pageSize: Int, orderClauses: Seq[OrderBy] = Seq(OrderAsc("id"))): FutureTx[Rows] = { context =>
+    LoggingFuture {
       val st = context.conn.createStatement()
       try {
         val clause = where() orderBy (orderClauses: _*) limit(start, pageSize)

@@ -26,7 +26,7 @@ private case class PageImpl private (indexCol: String,
 
   require(rows.nonEmpty, "The EmptyPage handles no row situations.")
 
-  import view.ds
+  import view.runContext.ds
 
   private val firstIndexInPage = rows.head[Number](indexCol).longValue
   private val lastIndexInPage = rows.last[Number](indexCol).longValue
@@ -48,12 +48,12 @@ private case class PageImpl private (indexCol: String,
   private lazy val nextRows = view.filter(
     where (s"$indexCol > ?", lastIndexInPage) and filter
       orderBy OrderAsc(indexCol)
-      limit pageSize).run
+      limit pageSize).runSync.get
 
   private lazy val prevRows = view.filter(
     where (s"$indexCol < ?", firstIndexInPage) and filter
       orderBy OrderDesc(indexCol)
-      limit pageSize).run
+      limit pageSize).runSync.get
 
 }
 
@@ -107,7 +107,7 @@ class PagedView private ( view:Query,
     * An enclosing tx may be necessary if the rows contain Blobs, and early blob freeing is not
     * true. In this case, the blobs are only guaranteed to live until the tx is closed.
     */
-  import view.ds
+  import view.runContext.ds
 
   override def iterator: Iterator[Rows] = new ToIterator(this).toIterator
 
@@ -116,7 +116,7 @@ class PagedView private ( view:Query,
     val rows = view.filter(
       filter
         orderBy OrderDesc(indexCol)
-        limit pageSize).run
+        limit pageSize).runSync.get
 
     if(rows.isEmpty) EmptyPage(this)
     else PageImpl(indexCol, view, rows.reverse, pageSize, filter)
@@ -126,7 +126,7 @@ class PagedView private ( view:Query,
     val rows = view.filter(
       filter
         orderBy OrderAsc(indexCol)
-        limit pageSize).run
+        limit pageSize).runSync.get
 
     if(rows.isEmpty) EmptyPage(this)
     else PageImpl(indexCol, view, rows, pageSize, filter)

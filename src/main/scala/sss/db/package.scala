@@ -6,16 +6,14 @@ import java.sql.Blob
 import java.util.regex.Pattern
 
 import javax.sql.DataSource
+import sss.ancillary.FutureOps._
 import sss.db.NullOrder.NullOrder
 
 import scala.collection.mutable
 import scala.collection.mutable.WrappedArray
-import scala.concurrent.duration.Duration
 import scala.concurrent.{ExecutionContext, Future}
 import scala.language.implicitConversions
 import scala.util.{Failure, Success, Try}
-
-import sss.ancillary.FutureOps._
 
 /**
  * @author alan
@@ -60,11 +58,17 @@ package object db {
 
 
 
-  implicit class RunOp[T](val t:Transaction[T]) extends AnyVal {
-    def run(implicit d: DataSource, ec: ExecutionContext): Future[T] = {
-      val c = d.getConnection
+  class RunContext(aDs: DataSource,
+                        anEc: ExecutionContext) {
+    implicit val ds: DataSource = aDs
+    implicit val ec: ExecutionContext = anEc
+  }
+
+  implicit class RunOp[T](val t:FutureTx[T]) extends AnyVal {
+    def run(implicit runContext: RunContext): Future[T] = {
+      val c = runContext.ds.getConnection
       Try {
-        t(TransactionContext(c, ec))
+        t(TransactionContext(c, runContext.ec))
       } match {
         case Failure(e) =>
           c.rollback()
@@ -77,7 +81,7 @@ package object db {
     }
   }
 
-  implicit class RunSyncOp[T](val t:Transaction[T]) extends AnyVal {
+  implicit class RunSyncOp[T](val t:FutureTx[T]) extends AnyVal {
     def runSync(implicit d: DataSource): Try[T] = {
       val c = d.getConnection
 
