@@ -2,6 +2,7 @@ package sss.db
 import java.sql.Connection
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.Try
 
 case class TransactionContext(conn: Connection, implicit val ec: ExecutionContext)
 
@@ -16,6 +17,11 @@ trait FutureTx[T] extends (TransactionContext => Future[T]) {
   def map[C](t: T => C): FutureTx[C] = context => {
     import context.ec
     apply(context) map t
+  }
+
+  def andAfter[U](pf: PartialFunction[Try[T], U]): FutureTx[T]  = context => {
+    import context.ec
+    apply(context).andThen(pf)
   }
 }
 

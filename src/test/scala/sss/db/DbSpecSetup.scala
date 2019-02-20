@@ -10,6 +10,7 @@ trait DbSpecSetupBase extends Matchers with BeforeAndAfter {
   case class TestFixture(dbUnderTest: Db, table: Table)
 
   val dbConfigName = "testDb"
+  val dataSource = DataSource(s"$dbConfigName.datasource")
   var fixture: TestFixture = _
 
   val idCol = "id"
@@ -18,12 +19,14 @@ trait DbSpecSetupBase extends Matchers with BeforeAndAfter {
   val testPaged2 = "testPaged2"
 
   before {
-    val dbUnderTest = Db(dbConfigName, DataSource(s"$dbConfigName.datasource"))
+    val dbUnderTest = Db(dbConfigName, dataSource)
     fixture = TestFixture(dbUnderTest, dbUnderTest.table("test"))
   }
 
   after {
-    fixture.dbUnderTest.shutdown
+    val db = fixture.dbUnderTest
+    import db.runContext.ds
+    fixture.dbUnderTest.shutdown.runSync
   }
 
 }

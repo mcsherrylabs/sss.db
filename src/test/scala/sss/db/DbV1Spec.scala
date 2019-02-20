@@ -19,7 +19,6 @@ class DbV1Spec extends DbSpecSetup {
 
   it should " be able to read all rows from a table " in {
 
-
     val db = fixture.dbUnderTest
     import db.runContext.ds
 

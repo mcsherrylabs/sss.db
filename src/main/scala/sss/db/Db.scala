@@ -10,6 +10,7 @@ import sss.db.datasource.DataSource._
 import scala.concurrent.ExecutionContext
 
 
+
 object Db {
 
   def apply(dbConfig: DbConfig)(ds:CloseableDataSource,
@@ -73,8 +74,8 @@ class Db(dbConfig: DbConfig)(closeableDataSource:CloseableDataSource, ec: Execut
   def select(sql: String): Query = new Query(sql, runContext, dbConfig.freeBlobsEarly)
 
 
-  def shutdown = {
-    executeSql("SHUTDOWN") map (_ => closeableDataSource.close())
+  def shutdown: FutureTx[Int] = {
+    executeSql("SHUTDOWN")
   }
 
   /**
