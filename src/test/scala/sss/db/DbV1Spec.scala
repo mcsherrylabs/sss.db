@@ -4,6 +4,8 @@ import java.util.Date
 
 import org.scalatest.DoNotDiscover
 
+import scala.util.control.NonFatal
+
 @DoNotDiscover
 class DbV1Spec extends DbSpecSetup {
 
@@ -29,8 +31,8 @@ class DbV1Spec extends DbSpecSetup {
     } yield rows
 
     val rows = rowsT.runSync.get
-    assert(rows.size === 2, "Should only be one row!")
-    val row = rows(1)
+    assert(rows.size === 1, "Should only be one row!")
+    val row = rows(0)
 
     assert(row[String]("strId") == "strId")
     assert(row("createTime") === time.getTime)
@@ -63,11 +65,14 @@ class DbV1Spec extends DbSpecSetup {
 
   }
 
-  /*it should " be able to find the row inserted " in {
+  it should " be able to find the row inserted " in {
+
+    val db = fixture.dbUnderTest
+    import db.runContext.ds
 
     val time = new Date()
-    fixture.table.insert(0, "strId", time, 45)
-    val rows = fixture.table.filter(where(ps"createTime = ${time.getTime}"))
+    fixture.table.insert(0, "strId", time, 45).runSync
+    val rows = fixture.table.filter(where(ps"createTime = ${time.getTime}")).runSync.get
     assert(rows.size === 1, "Should only be one row found !")
     val row = rows(0)
     assert(row("strId") === "strId")
@@ -77,9 +82,12 @@ class DbV1Spec extends DbSpecSetup {
 
   it should " support shorthand filter" in {
 
+    val db = fixture.dbUnderTest
+    import db.runContext.ds
+
     val time = new Date()
-    fixture.table.insert(3456, "strId", time, 45)
-    val rows = fixture.table.filter("createTime" -> time)
+    fixture.table.insert(3456, "strId", time, 45).runSync
+    val rows = fixture.table.filter("createTime" -> time).runSync.get
     assert(rows.size === 1, "Should only be one row found !")
     val row = rows(0)
     assert(row("strId") === "strId")
@@ -88,148 +96,88 @@ class DbV1Spec extends DbSpecSetup {
   }
 
   it should " be able to find the row inserted by id " in {
+    val db = fixture.dbUnderTest
+    import db.runContext.ds
 
     val time = new Date()
-    fixture.table.insert(99, "strId", time, 45)
-    fixture.table.get(99) match {
-      case None => fail("oh oh, failed to find row by id")
-      case Some(r) => assert(r("id") === 99)
-    }
+    (fixture.table.insert(99, "strId", time, 45) flatMap { i =>
+      fixture.table.get(99) map {
+        case None => fail("oh oh, failed to find row by id")
+        case Some(r) => assert(r("id") === 99)
+      }
+    }).runSync.get
   }
 
   it should " be able to find the row searching by field name " in {
 
+    val db = fixture.dbUnderTest
+    import db.runContext.ds
+
     val time = new Date()
-    fixture.table.insert(99, "strId", time, 45)
-    fixture.table.find(where(s"id = ?", 99)) match {
+
+    val p = for {
+      _ <- fixture.table.insert(99, "strId", time, 45)
+      r <- fixture.table.find(where(s"id = ?", 99))
+    } yield r match {
       case None => fail("oh oh, failed to find row by id")
-      case Some(r) => assert(r("id") === 99)
+      case Some(r1) => assert(r1("id") === 99)
     }
+
+    p.runSync.get
   }
 
   it should " support shorthand find " in {
 
+    val db = fixture.dbUnderTest
+    import db.runContext.ds
+
     val time = new Date()
-    fixture.table.insert(100, "strId", time, 45)
-    fixture.table.find("id" -> 100) match {
+    val p = for {
+      _ <- fixture.table.insert(100, "strId", time, 45)
+      rOpt <- fixture.table.find("id" -> 100)
+    } yield rOpt match {
       case None => fail("oh oh, failed to find row by id")
       case Some(r) => assert(r("id") === 100)
     }
-    fixture.table.find("id" -> 100, "strId" -> "strId", "createTime" -> time) match {
-      case None => fail("oh oh, failed to find row ")
-      case Some(r) => assert(r("createTime") === time.getTime)
-    }
+
+    p.runSync.get
   }
 
   it should " not be able to find a single row when 2 are present " in {
 
+    val db = fixture.dbUnderTest
+    import db.runContext.ds
+
     val time = new Date()
-    fixture.table.insert(99, "strId", time, 45)
-    fixture.table.insert(100, "strId", time, 45)
+
+    (for {
+      _ <- fixture.table.insert(99, "strId", time, 45)
+      _ <- fixture.table.insert(100, "strId", time, 45)
+    } yield ()).runSync.get
+
     try {
-      fixture.table.find(where(s"strId = ?", "strId"))
+      fixture.table.find(where(s"strId = ?", "strId")).runSync.get
       fail("there are 2 rows with strId,  should throw ...")
     } catch {
-      case e: Error =>
+      case NonFatal(e)  =>
     }
   }
 
-  it should " support a transaction " in {
+  it should "support a transaction" in {
     val time = new Date()
-    try {
-      fixture.table.inTransaction {
-        fixture.table.insert(999999, "strId", time, 45)
-        throw new Error("Ah HA!")
+    val db = fixture.dbUnderTest
+    import db.runContext.ds
 
-      }
-    } catch {
-      case e: Error => println(e)
-    }
+    val p = for {
+      _ <- fixture.table.insert(999999, "strId", time, 45)
+      _ =  throw new RuntimeException("Ah HA!")
+     r <- fixture.table.insert(199999, "strId", time, 45)
+    } yield r
 
-    try {
-      fixture.table.find(idCol -> 999999) match {
-        case Some(r) => fail("there is a row with 999999,  should have thrown ex ...")
-        case x =>
-      }
-
-    } catch {
-      case e: Error =>
-    }
-
-    try {
-      fixture.table.inTransaction {
-        fixture.table.insert(999999, "strId", time, 45)
-      }
-    } catch {
-      case e: Error => println(e)
-    }
-
-    try {
-      fixture.table.find(where(ps"id = ${999999}")) match {
-        case Some(r) =>
-        case x => fail("there is no row with 999999...")
-      }
-
-    } catch {
-      case e: Error =>
-    }
-  }
-
-  it should " support a transaction from db level " in {
-    val time = new Date()
-    try {
-      fixture.dbUnderTest.inTransaction {
-        fixture.table.insert(999999, "strId", time, 45)
-        throw new Error("Ah HA!")
-
-      }
-    } catch {
-      case e: Error => println(e)
-    }
-
-    fixture.table.find(where("id = ?", 999999)) match {
-      case Some(r) => fail("there is a row with 999999,  should have thrown ex ...")
-      case x =>
-    }
-
-    fixture.dbUnderTest.inTransaction {
-      fixture.table.insert(999999, "strId", time, 45)
-
-      fixture.table.find(where("id = ?", 999999))
-        .getOrElse(fail("there is no row with 999999..."))
-    }
-  }
-
-  it should " honour executeSql fail from db level transaction " in {
-    val time = new Date()
-    try {
-      fixture.dbUnderTest.inTransaction {
-        val n = fixture.table.name
-        fixture.dbUnderTest.executeSql(s"INSERT INTO $n VALUES (999999, 'strId', ${time.getTime}, 45)")
-        throw new Error("Ah HA!")
-
-      }
-    } catch {
-      case e: Error => println(e)
-    }
-
-
-    assert(fixture.table.find(where("id = ?", 999999)).isEmpty,
-      "there is a row with 999999,  should have thrown ex ...")
+    assert(p.runSync.isFailure)
+    assert(fixture.table.find(idCol -> 199999).runSync.get.isEmpty)
+    assert(fixture.table.find(idCol -> 999999).runSync.get.isEmpty)
 
   }
-  it should " honour executeSql from db level transaction " in {
-    val time = new Date()
-    val n = fixture.table.name
-
-    fixture.dbUnderTest.inTransaction {
-      fixture.dbUnderTest.executeSql(s"INSERT INTO $n VALUES (999999, 'strId', ${time.getTime}, 45)")
-    }
-
-    fixture.table.find(where("id = ?", 999999)) match {
-      case Some(r) =>
-      case None => fail("there is no row with 999999.")
-    }*/
-
 
 }

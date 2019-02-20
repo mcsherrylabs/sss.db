@@ -45,11 +45,11 @@ class Db(dbConfig: DbConfig)(closeableDataSource:CloseableDataSource, ec: Execut
   private lazy val viewCache  = new SynchronizedLruMap[String, View](dbConfig.viewCachesSize)
   private lazy val tableCache = new SynchronizedLruMap[String, Table](dbConfig.viewCachesSize)
 
-  implicit val runContext: RunContext = new RunContext(closeableDataSource, ec)
-
   if(dbConfig.useShutdownHook) sys addShutdownHook shutdown
 
-  DbInitialSqlExecutor(dbConfig: DbConfig, executeSql _)(closeableDataSource)
+  DbInitialSqlExecutor(dbConfig: DbConfig, executeSql)(closeableDataSource)
+
+  implicit val runContext: RunContext = new RunContext(closeableDataSource, ec)
 
   def table(name: String): Table =  tableCache.getOrElseUpdate(name, new Table(name, runContext, dbConfig.freeBlobsEarly))
 
@@ -75,7 +75,7 @@ class Db(dbConfig: DbConfig)(closeableDataSource:CloseableDataSource, ec: Execut
 
 
   def shutdown: FutureTx[Int] = {
-    executeSql("SHUTDOWN")
+    executeSql("SHUTDOWN") //andAfter{case _  => closeableDataSource.close()}
   }
 
   /**
@@ -102,7 +102,7 @@ class Db(dbConfig: DbConfig)(closeableDataSource:CloseableDataSource, ec: Execut
     val st = context.conn.createStatement()
     try {
       LoggingFuture(st.executeUpdate(sql))(context.ec)
-    } finally st.close
+    } finally st.close()
   }
 
 
