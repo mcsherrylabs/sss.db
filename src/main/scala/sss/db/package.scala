@@ -71,11 +71,16 @@ package object db {
         t(TransactionContext(c, runContext.ec))
       } match {
         case Failure(e) =>
-          c.rollback()
-          c.close()
+
+          try c.rollback()
+          finally c.close()
+
           throw e
         case Success(result) =>
-          c.close()
+
+          try { c.commit()
+          } finally c.close()
+
           result
       }
     }
@@ -89,11 +94,14 @@ package object db {
         t(TransactionContext(c, ExecutionContextHelper.synchronousExecutionContext))
       } match {
         case Failure(e) =>
-          c.rollback()
-          c.close()
+          try c.rollback()
+          finally c.close()
           throw e
         case Success(result) =>
-          c.close()
+
+          try c.commit()
+          finally c.close()
+
           result.toTry()
       }
     }
