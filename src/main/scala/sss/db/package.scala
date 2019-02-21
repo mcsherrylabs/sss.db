@@ -109,6 +109,7 @@ package object db extends Logging {
 
       }
     }
+    def runSyncUnSafe(implicit d: DataSource): T = runSync.get
 
 }
 

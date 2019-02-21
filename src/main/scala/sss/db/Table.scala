@@ -63,11 +63,17 @@ class Table private[db] (name: String,
     }
 
     if (usingVersion) {
-      update(minusVersion, where(id -> values(id)) and where("version" -> values(version)), true)
+      for {
+        _ <- update(minusVersion, where(id -> values(id)) and where("version" -> values(version)), true)
+        r <- apply(values(id).asInstanceOf[Number].longValue())
+      } yield r
     } else {
-      update(minusVersion, where(id -> values(id)))
+      for {
+        _ <- update(minusVersion, where(id -> values(id)))
+        r <- apply(values(id).asInstanceOf[Number].longValue())
+      } yield r
     }
-    apply(values(id).asInstanceOf[Number].longValue())
+
   }
 
   /**
@@ -119,9 +125,9 @@ class Table private[db] (name: String,
   def persist(values: Map[String, Any]): FutureTx[Row] = {
 
     values.partition(kv => id.equalsIgnoreCase(kv._1)) match {
-      case (mapWithId, rest) if(mapWithId.isEmpty)       => insert(rest)
-      case (mapWithId, rest) if(mapWithId.head._2 == 0l) => insert(rest)
-      case _                                             => updateRow(values)
+      case (mapWithId, rest) if mapWithId.isEmpty       => insert(rest)
+      case (mapWithId, rest) if mapWithId.head._2 == 0l => insert(rest)
+      case _                                            => updateRow(values)
     }
   }
 
