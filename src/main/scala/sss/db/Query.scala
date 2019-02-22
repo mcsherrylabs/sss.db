@@ -179,7 +179,7 @@ class Query private[db] (private val selectSql: String,
 
   def toPaged(pageSize: Int,
               filter: Where = where(),
-              indexCol: String = "id") =
+              indexCol: String = "id"): PagedView =
     PagedView(this, pageSize, filter, indexCol)
 
 }
