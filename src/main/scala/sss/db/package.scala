@@ -2,7 +2,7 @@ package sss
 
 import java.io.{ByteArrayInputStream, InputStream}
 import java.math.BigDecimal
-import java.sql.Blob
+import java.sql.{Blob, Connection}
 import java.util.regex.Pattern
 
 import javax.sql.DataSource
@@ -94,8 +94,13 @@ package object db extends Logging {
   }
 
   implicit class RunSyncOp[T](val t: FutureTx[T]) extends AnyVal {
+
     def runSync(implicit d: DataSource): Try[T] = {
-      val c = d.getConnection
+      runSync(d.getConnection)
+    }
+
+    def runSync(c: Connection): Try[T] = {
+
       t(TransactionContext(c, ExecutionContextHelper.synchronousExecutionContext)).toTry() match {
         case o@Failure(_) =>
           Try(c.rollback()) recover { case e => log.warn(e.toString)}

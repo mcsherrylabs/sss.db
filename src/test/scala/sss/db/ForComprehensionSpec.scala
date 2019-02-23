@@ -15,15 +15,14 @@ class ForComprehensionSpec extends DbSpecSetup {
 
     val rows = for {
       x <- 0 until 10
-      _ = db.table("testForComp").insert(x, x+1, "strId" + x).runSyncUnSafe
+      r = db.table("testForComp").insert(x, x+1, "strId" + x).runSyncUnSafe
       // Stream doesn't end if you keeep returning empty rows ...
-      rs: Rows <- fixture.dbUnderTest.table("testForComp").toPaged(2).toStream.take(10).map(_.runSyncUnSafe)
-      r        <- rs
-      if r[Int](idCol) == 1
+      //r        <- rs
+      //if r[Int](idCol) == 1
     } yield r
 
-
-    assert(rows.size === 10, "Should be 10 rows!")
+    val rs: Rows = fixture.dbUnderTest.table("testForComp").toPaged(10).firstPage.runSyncUnSafe.map(_.rows).getOrElse(Rows.empty)
+    assert(rs.size === 10, "Should be 10 rows!")
 
   }
 

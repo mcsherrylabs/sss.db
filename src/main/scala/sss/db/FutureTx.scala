@@ -6,7 +6,7 @@ import scala.util.Try
 
 case class TransactionContext(conn: Connection, implicit val ec: ExecutionContext)
 
-trait FutureTx[T] extends (TransactionContext => Future[T]) {
+trait FutureTx[+T] extends (TransactionContext => Future[T]) {
 
   def flatMap[C](t: T => FutureTx[C]): FutureTx[C] = context => {
     import context.ec

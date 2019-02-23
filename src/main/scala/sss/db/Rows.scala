@@ -7,6 +7,9 @@ import scala.annotation.tailrec
 
 
 object Rows {
+
+  val empty: Rows = IndexedSeq.empty
+
   def apply(rs: ResultSet, freeBlobsEarly: Boolean): Rows = parse(rs, freeBlobsEarly)
 
   def parse(rs: ResultSet,freeBlobsEarly: Boolean): Rows = {
