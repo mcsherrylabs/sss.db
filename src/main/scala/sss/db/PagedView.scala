@@ -1,8 +1,9 @@
 package sss.db
 
+import javax.sql.DataSource
 import sss.db.PagedView.ToIterator
 
-import scala.concurrent.Future
+import scala.util.{Failure, Success}
 
 /**
   * Created by alan on 6/21/16.
@@ -11,8 +12,8 @@ trait Page {
   val rows: Rows
   val next: FutureTx[Option[Page]]
   val prev: FutureTx[Option[Page]]
-  val hasNext: FutureTx[Boolean] = next.map (_.exists(_ => true))
-  val hasPrev: FutureTx[Boolean] = prev.map (_.exists(_ => true))
+  val hasNext: FutureTx[Boolean] = next.map(_.exists(_ => true))
+  val hasPrev: FutureTx[Boolean] = prev.map(_.exists(_ => true))
   /**
     * An enclosing tx may be necessary if the rows contain Blobs, and early blob freeing is not
     * true. In this case, the blobs are only guaranteed to live until the tx is closed.
@@ -20,56 +21,49 @@ trait Page {
 
 }
 
-private case class PageImpl private (indexCol: String,
-                                     view: Query,
-                                     rows: Rows,
-                                     pageSize: Int,
-                                     filter: Where) extends Page {
+private case class PageImpl private(indexCol: String,
+                                    view: Query,
+                                    rows: Rows,
+                                    pageSize: Int,
+                                    filter: Where) extends Page {
 
   require(rows.nonEmpty, "The EmptyPage handles no row situations.")
 
-  private val firstIndexInPage = rows.head[Number](indexCol).longValue
-  private val lastIndexInPage = rows.last[Number](indexCol).longValue
-
+  lazy private val firstIndexInPage = rows.head[Number](indexCol).longValue
+  lazy private val lastIndexInPage = rows.last[Number](indexCol).longValue
 
   lazy override val next: FutureTx[Option[Page]] = {
-    nextRows.map (rows =>
-      if (rows.isEmpty) None
-      else Some(PageImpl(indexCol, view, rows, pageSize, filter))
+    nextRows.map(rs =>
+      if (rs.isEmpty) None
+      else Some(PageImpl(indexCol, view, rs, pageSize, filter))
     )
   }
 
   lazy override val prev: FutureTx[Option[Page]] = {
 
     prevRows.map(rs =>
-      if(rs.isEmpty) None
+      if (rs.isEmpty) None
       else Some(PageImpl(indexCol, view, rs.reverse, pageSize, filter)))
   }
 
 
   private lazy val nextRows = view.filter(
-      where (s"$indexCol > ?", lastIndexInPage) and filter
-        orderBy OrderAsc(indexCol)
-        limit pageSize)
+    where(s"$indexCol > ?", lastIndexInPage) and filter
+      orderBy OrderAsc(indexCol)
+      limit pageSize)
 
 
   private lazy val prevRows = view.filter(
-      where(s"$indexCol < ?", firstIndexInPage) and filter
-        orderBy OrderDesc(indexCol)
-        limit pageSize)
+    where(s"$indexCol < ?", firstIndexInPage) and filter
+      orderBy OrderDesc(indexCol)
+      limit pageSize)
 
 
-}
-
-case class EmptyPage(pagedView: PagedView) extends Page {
-  override val rows: Rows = IndexedSeq()
-  lazy override val next: FutureTx[Option[Page]] = pagedView.lastPage
-  lazy override val prev: FutureTx[Option[Page]] = pagedView.firstPage
 }
 
 object PagedView {
 
-  def apply(view:Query, pageSize: Int, filter: Where = where(), indexCol: String = "id"): PagedView = {
+  def apply(view: Query, pageSize: Int, filter: Where = where(), indexCol: String = "id"): PagedView = {
     new PagedView(view, pageSize, filter, indexCol)
   }
 
@@ -80,43 +74,33 @@ object PagedView {
     * @return
     */
   implicit class ToIterator(val pagedView: PagedView) extends AnyVal {
-    def toIterator: FutureTx[Iterator[Rows]] = ToStream(pagedView).toFutureTxStream.map(_.iterator)
+    def toIterator(implicit dataSource: DataSource): Iterator[Row] = ToStream(pagedView).toStream.iterator
   }
 
   implicit class ToStream(val pagedView: PagedView) extends AnyVal {
 
-    //There is no Stream.unfold in std lib as of 2.13
-    def toFutureTxStream: FutureTx[Stream[Rows]] = {
+    def toStream(implicit dataSource: DataSource): Stream[Row] = {
 
-      def toStream(fPage: => FutureTx[Option[Page]]): FutureTx[Stream[Rows]] = {
-        fPage.flatMap {
-          case None => FutureTx.unit(Stream.empty[Rows])
-          case Some(page) =>
-            if (page.rows.isEmpty) FutureTx.unit(Stream.empty[Rows])
-            else { context =>
-              import context.ec
-              page.next.map(println(_))(context)
-              toStream(page.next)(context) map { tail =>
-                Stream.cons(page.rows, tail)
-              }
-            }
+      def toStream(fPage: FutureTx[Option[Page]]): Stream[Rows] = {
+
+        fPage.runSync match {
+          case Failure(e) => Stream.empty[Rows]
+          case Success(pageOpt) => pageOpt match {
+            case Some(page) => page.rows #:: toStream(page.next)
+            case None => Stream.empty[Rows]
+          }
         }
-
       }
-
-      toStream(pagedView.firstPage)
+      toStream(pagedView.firstPage).flatten
     }
   }
 
 }
 
-class PagedView private ( view:Query,
-                          pageSize: Int,
-                          filter: Where,
-                          indexCol: String) extends FutureTx[Iterable[Rows]] {
-
-  override def apply(context: TransactionContext): Future[Iterable[Rows]] =
-    futureTxIterator.map(_.toIterable)(context)
+class PagedView private(view: Query,
+                        pageSize: Int,
+                        filter: Where,
+                        indexCol: String) {
 
   /**
     * An enclosing tx may be necessary if the rows contain Blobs, and early blob freeing is not
@@ -124,7 +108,7 @@ class PagedView private ( view:Query,
     */
 
 
-  def futureTxIterator: FutureTx[Iterator[Rows]] = new ToIterator(this).toIterator
+  def iterator(implicit dataSource: DataSource): Iterator[Row] = new ToIterator(this).toIterator
 
   def lastPage: FutureTx[Option[Page]] = {
 
@@ -147,4 +131,5 @@ class PagedView private ( view:Query,
       else Some(PageImpl(indexCol, view, rows, pageSize, filter))
     }
   }
+
 }

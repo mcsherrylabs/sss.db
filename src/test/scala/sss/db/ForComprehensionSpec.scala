@@ -13,20 +13,24 @@ class ForComprehensionSpec extends DbSpecSetup {
     val db = fixture.dbUnderTest
     import db.runContext.ds
 
-    val rows = for {
-      x <- 0 until 10
-      r = db.table("testForComp").insert(x, x+1, "strId" + x).runSyncUnSafe
-      // Stream doesn't end if you keeep returning empty rows ...
-      //r        <- rs
-      //if r[Int](idCol) == 1
-    } yield r
+    for {
+      x <- 0 until 100
+      _ = db.table("testForComp").insert(x, x+1, "strId" + x).runSyncUnSafe
 
-    val rs: Rows = fixture.dbUnderTest.table("testForComp").toPaged(10).firstPage.runSyncUnSafe.map(_.rows).getOrElse(Rows.empty)
-    assert(rs.size === 10, "Should be 10 rows!")
+    } yield ()
+
+    var rs: Stream[Row] = fixture.dbUnderTest.table("testForComp").toPaged(2).toStream
+
+    0 until 50 foreach { i =>
+      println(s"$i ${rs.headOption}")
+      rs = rs.tail
+    }
+
+    //assert(rows.size === 10, "Should be 10 rows!")
 
   }
 
-  /*def createAndFillTenTables: Seq[String] = {
+  def createAndFillTenTables: Seq[String] = {
 
     val db = fixture.dbUnderTest
     import db.runContext.ds
@@ -55,14 +59,16 @@ class ForComprehensionSpec extends DbSpecSetup {
 
   it should " support paged iterator generator " in {
 
+    val db = fixture.dbUnderTest
+    import db.runContext.ds
+
     val tableNames = createAndFillTenTables
     // go through each table in a paged manner and find all the rows
     // where the idCol is 1 or 9, should be 20 of them.
     val allRows = for {
       name <- tableNames
       table = fixture.dbUnderTest.table(name)
-      rows <- table.toPaged(3).toIterator
-      row <- rows
+      row <- table.toPaged(3).toIterator
       if row[Int](idCol) == 1 || row[Int](idCol) == 9
     } yield row
 
@@ -76,94 +82,61 @@ class ForComprehensionSpec extends DbSpecSetup {
     assert(checked.size === 0)
   }
 
-  it should " support paged iterable generator " in {
-    val tableNames = createAndFillTenTables
-    val allRows = for {
-      name <- tableNames
-      table = fixture.dbUnderTest.table(name)
-      rows <- table.toPaged(3)
-      row  <- rows
-      if row[Int](idCol) == 1 || row[Int](idCol) == 9
-    } yield row
-
-    //allRows.foreach(println)
-    assert(allRows.size === 20)
-  }
-
-  it should " support commit in transactions using Try " in {
-
-    val x = 1000
-    val t = fixture.dbUnderTest.table("testForComp")
-
-    import t.tx
-
-    def goodTx2(r: Int): Try[Int] = Try(t.insert(r, r + 1, "strId" + r))
-
-    def goodTx1: Try[Int] = Try(t.insert(x, x + 1, "strId" + x))
-
-    val result: Try[Int] = tx {
-      for {
-        v1 <- goodTx1
-        v2 <- goodTx2(x + v1)
-      } yield (v2)
-    }
-
-    assert(result.isSuccess)
-    assert(result.get == 1, "Should only insert 1 row")
-    assert(t.find(where(idCol -> x)).isDefined, "tx should have committed ")
-    assert(t.find(where(idCol -> (x + 1))).isDefined, "tx should have committed second write also")
-
-  }
-
   it should " support rollback in transactions using Try " in {
 
+    val db = fixture.dbUnderTest
+    import db.runContext.ds
     val x = 1000
     val t = fixture.dbUnderTest.table("testForComp")
 
-    import t.tx
 
-    def badTx(r: Int): Try[Int] = Try {
+
+    def badTx(r: Int):FutureTx[Int] = {
       assert(r == x + 1)
       throw new RuntimeException("Woh!")
     }
 
-    def goodTx: Try[Int] = Try(t.insert(x, x + 1, "strId" + x))
+    def goodTx= t.insert(x, x + 1, "strId" + x)
 
-    val result: Try[Int] = tx {
-      for {
+    val result =
+      (for {
         v1 <- goodTx
         v2 <- badTx(v1)
-      } yield (v2)
-    }
+      } yield v2).runSync
+
     assert(result.isFailure, "Should have thrown exception in badTx")
-    assert(t.find(where(idCol -> x)).isEmpty, "tx rollback should have prevented row write")
+    assert(t.find(where(idCol -> x)).runSyncUnSafe.isEmpty, "tx rollback should have prevented row write")
 
   }
 
 
 
   it should " support nested generator (thru flatMap) " in {
+
+    val db = fixture.dbUnderTest
+    import db.runContext.ds
+
     val tableNames = createAndFillTenTables
-    val allRows = for {
+
+    val r1: Seq[Row] = for {
       name <- tableNames
       table = fixture.dbUnderTest.table(name)
-      row <- table
-      row2 <- fixture.dbUnderTest.table(name)
-    } yield ((row, row2))
+      row <- table.map(identity).runSyncUnSafe
+    } yield row
 
-    assert(allRows.size === 1000)
+    assert(r1.size === 100)
 
     val allRowsFiltered = for {
       name <- tableNames
-      table = fixture.dbUnderTest.table(name)
+      table = fixture.dbUnderTest.table(name).map(identity).runSyncUnSafe
       row <- table
-      row2 <- fixture.dbUnderTest.table(name)
-      if(row[Int](idCol) == row2[Int](idCol))
-    } yield ((row, row2))
+      row2 <- fixture.dbUnderTest.table(name).map(identity).runSyncUnSafe
+      if row[Int](idCol) == row2[Int](idCol)
+    } yield row2
 
     assert(allRowsFiltered.size === 100)
     //allRowsFiltered.foreach(println)
 
-  }*/
+  }
 
 }
