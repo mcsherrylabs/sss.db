@@ -4,6 +4,7 @@ package sss.db
 import com.twitter.util.SynchronizedLruMap
 import com.typesafe.config.Config
 import sss.ancillary.{DynConfig, Logging, LoggingFutureSupport}
+import sss.db.TxIsolationLevel.TxIsolationLevel
 import sss.db.datasource.DataSource
 import sss.db.datasource.DataSource._
 
@@ -50,6 +51,8 @@ class Db(dbConfig: DbConfig)(closeableDataSource:CloseableDataSource, ec: Execut
   DbInitialSqlExecutor(dbConfig: DbConfig, executeSql)(closeableDataSource)
 
   implicit val runContext: RunContext = new RunContext(closeableDataSource, ec)
+
+  def runContext(level: TxIsolationLevel): RunContext = new RunContext(closeableDataSource, ec, Option(level))
 
   def table(name: String): Table =  tableCache.getOrElseUpdate(name, new Table(name, runContext, dbConfig.freeBlobsEarly))
 

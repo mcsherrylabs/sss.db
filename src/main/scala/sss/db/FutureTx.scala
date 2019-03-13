@@ -11,18 +11,29 @@ trait FutureTx[+T] extends (TransactionContext => Future[T]) {
   def flatMap[C](t: T => FutureTx[C]): FutureTx[C] = context => {
     import context.ec
     val g: Future[TransactionContext => Future[C]] = apply(context) map t
+    println("FutureTx flatMap")
     g flatMap (_(context))
   }
 
   def map[C](t: T => C): FutureTx[C] = context => {
     import context.ec
+    println("FutureTx map")
     apply(context) map t
   }
 
+  def withFilter(f: T => Boolean): FutureTx[T] = context => {
+    import context.ec
+    println("FutureTx withFilter")
+    apply(context) withFilter f
+  }
+
+
   def andAfter[U](pf: PartialFunction[Try[T], U]): FutureTx[T]  = context => {
     import context.ec
+    println("FutureTx andAfter")
     apply(context).andThen(pf)
   }
+
 }
 
 object FutureTx {

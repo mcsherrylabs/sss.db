@@ -9,6 +9,7 @@ import javax.sql.DataSource
 import sss.ancillary.FutureOps._
 import sss.ancillary.Logging
 import sss.db.NullOrder.NullOrder
+import sss.db.TxIsolationLevel.TxIsolationLevel
 
 import scala.collection.mutable
 import scala.concurrent.{ExecutionContext, Future}
@@ -64,15 +65,62 @@ package object db extends Logging {
   type ColumnTypes = SimpleColumnTypes with Option[SimpleColumnTypes]
 
 
+  object TxIsolationLevel extends Enumeration {
+    type TxIsolationLevel = Value
+    val NONE = Value(Connection.TRANSACTION_NONE)
+    val READ_COMMITTED = Value(Connection.TRANSACTION_READ_COMMITTED)
+    val READ_UNCOMMITTED = Value(Connection.TRANSACTION_READ_UNCOMMITTED)
+    val REPEATABLE_READ = Value(Connection.TRANSACTION_REPEATABLE_READ)
+    val SERIALIZABLE = Value(Connection.TRANSACTION_SERIALIZABLE)
+  }
+
   class RunContext(aDs: DataSource,
-                   anEc: ExecutionContext) {
+                   anEc: ExecutionContext,
+                   val isolationLevel: Option[TxIsolationLevel] = None
+                  ) {
     implicit val ds: DataSource = aDs
     implicit val ec: ExecutionContext = anEc
   }
 
   implicit class RunOp[T](val t: FutureTx[T]) extends AnyVal {
     def run(implicit runContext: RunContext): Future[T] = {
+
       val c = runContext.ds.getConnection
+      runContext.isolationLevel.foreach(l => c.setTransactionIsolation(l.id))
+
+      Try {
+        t(TransactionContext(c, runContext.ec))
+      } match {
+        case Failure(e) =>
+
+          try c.rollback()
+          finally c.close()
+
+          Future.failed(e)
+
+        case Success(result) =>
+          import runContext.ec
+          println(s"commit a!! $result")
+          result map { r =>
+            try {
+              c.commit()
+              println(s"commit!! $r")
+              r
+            } finally c.close()
+          } recoverWith { case e =>
+            try {
+              c.rollback()
+              Future.failed[T](e)
+            } finally c.close()
+          }
+
+      }
+    }
+
+    def runRollback(implicit runContext: RunContext): Future[T] = {
+      val c = runContext.ds.getConnection
+      runContext.isolationLevel.foreach(l => c.setTransactionIsolation(l.id))
+
       Try {
         t(TransactionContext(c, runContext.ec))
       } match {
@@ -83,12 +131,12 @@ package object db extends Logging {
 
           throw e
         case Success(result) =>
-
-          try {
-            c.commit()
-          } finally c.close()
-
-          result
+          import runContext.ec
+          result andThen { case _ =>
+            try {
+              c.rollback()
+            } finally c.close()
+          }
       }
     }
   }
@@ -101,7 +149,8 @@ package object db extends Logging {
 
     def runSync(c: Connection): Try[T] = {
 
-      t(TransactionContext(c, ExecutionContextHelper.synchronousExecutionContext)).toTry() match {
+      import scala.concurrent.duration._
+      t(TransactionContext(c, ExecutionContextHelper.synchronousExecutionContext)).toTry(1.second) match {
         case o@Failure(_) =>
           Try(c.rollback()) recover { case e => log.warn(e.toString) }
           Try(c.close()) recover { case e => log.warn(e.toString) }
