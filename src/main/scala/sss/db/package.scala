@@ -129,7 +129,8 @@ package object db extends Logging {
           try c.rollback()
           finally c.close()
 
-          throw e
+          Future.failed(e)
+
         case Success(result) =>
           import runContext.ec
           result andThen { case _ =>
