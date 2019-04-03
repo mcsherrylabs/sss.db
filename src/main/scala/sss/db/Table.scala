@@ -40,7 +40,7 @@ class Table private[db] ( name: String,
 
     try {
       val numRows = ps.executeUpdate()
-      if (updateVersionCol && numRows == 0) throw new DbOptimisticLockingException(s"No rows were updated, optimistic lock clash? ${name}:${values}")
+      if (updateVersionCol && numRows == 0) throw new DbOptimisticLockingException(s"No rows were updated, optimistic lock clash? $name:$values:$where")
     } finally {
       ps.close()
     }
