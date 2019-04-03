@@ -373,6 +373,15 @@ package object db extends Logging {
       massaged.asInstanceOf[T]
     }
 
+    def string(col:String): String = asMap(col.toLowerCase).asInstanceOf[String]
+    def longOpt(col:String): Option[Long] = Option(asMap(col.toLowerCase)) map (_.asInstanceOf[Long])
+    def long(col:String): Long = asMap(col.toLowerCase).asInstanceOf[Long]
+    def intOpt(col:String): Option[Int] = Option(asMap(col.toLowerCase)) map (_.asInstanceOf[Int])
+    def int(col:String): Int = asMap(col.toLowerCase).asInstanceOf[Int]
+    def arrayByte(col:String): Array[Byte] = asMap(col.toLowerCase).asInstanceOf[Array[Byte]]
+    def blobByte(col:String): Array[Byte] = blobToBytes(asMap(col.toLowerCase).asInstanceOf[Blob])
+
+
     private def blobToStream(jDBCBlobClient: Blob): InputStream = jDBCBlobClient.getBinaryStream
 
     private def blobToBytes(jDBCBlobClient: Blob): Array[Byte] = jDBCBlobClient.getBytes(1, jDBCBlobClient.length.toInt)
