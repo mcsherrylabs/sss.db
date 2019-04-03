@@ -110,7 +110,6 @@ class ForComprehensionSpec extends DbSpecSetup {
   }
 
 
-
   it should " support nested generator (thru flatMap) " in {
 
     val db = fixture.dbUnderTest

@@ -153,11 +153,13 @@ package object db extends Logging {
       import scala.concurrent.duration._
       t(TransactionContext(c, ExecutionContextHelper.synchronousExecutionContext)).toTry(1.second) match {
         case o@Failure(_) =>
+          //TODO Why bury these failures?
           Try(c.rollback()) recover { case e => log.warn(e.toString) }
           Try(c.close()) recover { case e => log.warn(e.toString) }
           o
 
         case o@Success(result) =>
+          //TODO Why bury these failures?
           Try(c.commit()) recover { case e => log.warn(e.toString) }
           Try(c.close()) recover { case e => log.warn(e.toString) }
           o
