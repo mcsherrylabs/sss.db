@@ -26,8 +26,8 @@ private case class PageImpl private (indexCol: String,
 
   require(!rows.isEmpty, "The EmptyPage handles no row situations.")
 
-  private val firstIndexInPage = rows.head[Number](indexCol).longValue
-  private val lastIndexInPage = rows.last[Number](indexCol).longValue
+  private val firstIndexInPage = rows.head.number(indexCol).longValue
+  private val lastIndexInPage = rows.last.number(indexCol).longValue
 
   override def tx[T](f: => T): T = view.tx[T](f)
 

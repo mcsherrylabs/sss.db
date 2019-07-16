@@ -13,7 +13,8 @@ class DbSpec extends
       new SqlInterpolatorSpec,
       new ParallelThreadSupportSpec,
       new ValidateTransactionSpec,
-      new SetIsolationLevelSupportSpec
+      new SetIsolationLevelSupportSpec,
+      new RowSerializeSpec
   ) with
   BeforeAndAfterAll with
   SequentialNestedSuiteExecution {

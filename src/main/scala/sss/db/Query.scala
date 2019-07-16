@@ -34,6 +34,19 @@ class Query private[db] (private val selectSql: String,
   protected val id = "id"
   protected val version = "version"
 
+
+  def noNullsAllowed(col: String): Boolean =
+    columnsMetaInfo.exists(e => e.name == col && e.noNullsAllowed)
+
+  lazy val columnsMetaInfo: ColumnsMetaInfo = tx {
+    val st = conn.createStatement()
+    try {
+
+      val rs = st.executeQuery(s"$selectSql")
+      Rows.columnsMetaInfo(rs.getMetaData)
+    } finally st.close()
+  }
+
   private[db] def mapToSql(value: Any): Any = {
     value match {
       case v: String => v //s"'${v}'"
@@ -46,6 +59,7 @@ class Query private[db] (private val selectSql: String,
       case v: Int => v
       case v: Long => v
       case v: Double => v
+      case v: Char => v
       case v: Byte => Array(v)
       case v: Array[Byte] => v
       case v: mutable.WrappedArray[_] => v.array
@@ -133,22 +147,16 @@ class Query private[db] (private val selectSql: String,
     * the lookup string.
     *
     * @param lookup (e.g. ("name" -> "John")
-    * @tparam T
     * @return
     */
 
-  def toIdOpt[T >: Long with Int: TypeTag](lookup: (String, Any)*): Option[T] = find(lookup: _*) map(_[T](id))
+  def toIntId(lookup: (String, Any)*): Int = toIntIdOpt(lookup: _*).get
+  def toIntIdOpt(lookup: (String, Any)*): Option[Int] = find(lookup: _*) map(_.int(id))
+  def toIntIds(lookup: (String, Any)*): Seq[Int] = filter(lookup: _*) map(_.int(id))
 
-  def toId[T >: Long with Int: TypeTag](lookup: (String, Any)*): T = toIdOpt[T](lookup: _*).get
-  def toIds[T >: Long with Int: TypeTag](lookup: (String, Any)*): Seq[T] = filter(lookup: _*) map(_[T](id))
-
-  def toIntId(lookup: (String, Any)*): Int = toId[Int](lookup: _*)
-  def toIntIdOpt(lookup: (String, Any)*): Option[Int] = toIdOpt[Int](lookup:_*)
-  def toIntIds(lookup: (String, Any)*): Seq[Int] = toIds[Int](lookup:_*)
-
-  def toLongId(lookup:(String, Any)*): Long = toId[Long](lookup:_*)
-  def toLongIdOpt(lookup:(String, Any)*): Option[Long] = toIdOpt[Long](lookup:_*)
-  def toLongIds(lookup:(String, Any)*): Seq[Long] = toIds[Long](lookup:_*)
+  def toLongId(lookup:(String, Any)*): Long = toLongIdOpt(lookup: _*).get
+  def toLongIdOpt(lookup:(String, Any)*): Option[Long] = find(lookup: _*) map(_.long(id))
+  def toLongIds(lookup:(String, Any)*): Seq[Long] = filter(lookup:_*) map(_.long(id))
 
   def get(id: Long): Option[Row] = getRow(id)
 

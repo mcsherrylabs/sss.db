@@ -10,27 +10,18 @@ import scala.collection.mutable
 import scala.util.Random
 
 
-/**
-  * Created by alan on Feb 19.
-  */
-@DoNotDiscover
-class BlobStoreSpec extends DbSpecSetup {
+object BlobStoreHelper {
 
-
-  def writeBytes(data: Stream[Array[Byte]], file: File) = {
-    val target = new BufferedOutputStream(new FileOutputStream(file))
-    try data.foreach(target.write) finally target.close
-  }
 
   val KB = 1024
+
+  val rootFolder = Files.createTempDirectory("").toFile // new File("/extra/home/alan")
 
   lazy val elem = {
     val e = new Array[Byte](KB)
     Random.nextBytes(e)
     e
   }
-
-  val rootFolder = Files.createTempDirectory("").toFile // new File("/extra/home/alan")
 
   def toStream(sizeInKb: Int): Stream[Array[Byte]] = Stream.tabulate(sizeInKb)(_ => elem)
 
@@ -41,23 +32,39 @@ class BlobStoreSpec extends DbSpecSetup {
     f
   }
 
+
+  def writeBytes(data: Stream[Array[Byte]], file: File) = {
+    val target = new BufferedOutputStream(new FileOutputStream(file))
+    try data.foreach(target.write) finally target.close
+  }
+
+}
+/**
+  * Created by alan on Feb 19.
+  */
+@DoNotDiscover
+class BlobStoreSpec extends DbSpecSetup {
+
+
+  import BlobStoreHelper._
+
   it should "support writing File to BLOB" in {
 
     val start = System.currentTimeMillis()
 
-    val numKB = KB * 10
+    val numB = KB * 10
     val table = fixture.dbUnderTest.testBinary
-    val fIn = createFile(numKB)
+    val fIn = createFile(numB)
     fIn.deleteOnExit()
 
     val startWrite = System.currentTimeMillis()
-    println(s"Setup/Create ${numKB} KB file took ${startWrite-start} ms")
+    println(s"Setup/Create ${numB} KB file took ${startWrite-start} ms")
 
     val in = new FileInputStream(fIn)
     val index = table.insert(Map("blobVal" -> in))
 
     val writeDone = System.currentTimeMillis()
-    println(s"Write ${numKB} KB file to db took ${writeDone - startWrite} ms")
+    println(s"Write ${numB} KB file to db took ${writeDone - startWrite} ms")
 
     val found = table.get(index.id)
     assert(found.isDefined)
@@ -79,7 +86,7 @@ class BlobStoreSpec extends DbSpecSetup {
     }
 
     val readDone = System.currentTimeMillis()
-    println(s"Read ${numKB} KBfile from db took ${readDone - writeDone} ms")
+    println(s"Read ${numB} KBfile from db took ${readDone - writeDone} ms")
 
     val f1 = new FileInputStream(fIn)
     val f2 = new FileInputStream(fOut)
@@ -92,7 +99,7 @@ class BlobStoreSpec extends DbSpecSetup {
       .foreach(_ => assert(util.Arrays.equals(bytes1, bytes2), "Read arrays did not match"))
 
     val compareDone = System.currentTimeMillis()
-    println(s"Compare 2 ${numKB} KB files took ${compareDone-writeDone} ms")
+    println(s"Compare 2 ${numB} KB files took ${compareDone-writeDone} ms")
   }
 
   it should " support persisting a byte as Binary" in {

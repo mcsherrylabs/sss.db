@@ -16,6 +16,7 @@ trait DbSpecSetupBase extends Matchers with BeforeAndAfter {
   val statusCol = "status_col"
   val testPaged = "testPaged"
   val testPaged2 = "testPaged2"
+  val testRowSerialize = "testRowSerialize"
 
   before {
     val dbUnderTest = Db(dbConfigName, DataSource(s"$dbConfigName.datasource"))
