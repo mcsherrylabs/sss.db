@@ -228,9 +228,7 @@ package object db {
       } else if (typeOf[T] == typeOf[InputStream] && rawVal.isInstanceOf[Blob]) {
         blobToStream(rawVal.asInstanceOf[Blob])
       } else if (typeOf[T] == typeOf[Byte] && rawVal.isInstanceOf[Array[Byte]]) {
-        val aryByte = rawVal.asInstanceOf[Array[Byte]]
-        assert(aryByte.length == 1)
-        aryByte(0)
+        shimObjectToByte(rawVal)
       } else if (typeOf[T] == typeOf[InputStream] && rawVal.isInstanceOf[Array[Byte]]) {
         val aryByte = rawVal.asInstanceOf[Array[Byte]]
         new ByteArrayInputStream(aryByte)
@@ -245,6 +243,12 @@ package object db {
       massaged.asInstanceOf[T]
     }
 
+
+    private def shimObjectToByte(o: Any): Byte = {
+      val aryByte = o.asInstanceOf[Array[Byte]]
+      assert(aryByte.length == 1)
+      aryByte(0)
+    }
 
     def number(col: String): Number = asMap(col.toLowerCase(Locale.ROOT)).asInstanceOf[Number]
 
@@ -265,9 +269,9 @@ package object db {
     def bigDecimalOpt(col: String): Option[BigDecimal] = Option(asMap(col.toLowerCase(Locale.ROOT))).map(_.asInstanceOf[BigDecimal])
 
 
-    def byteOpt(col: String): Option[Byte] = Option(asMap(col.toLowerCase(Locale.ROOT))).map(_.asInstanceOf[Byte])
+    def byteOpt(col: String): Option[Byte] = Option(asMap(col.toLowerCase(Locale.ROOT))).map(shimObjectToByte)
 
-    def byte(col: String): Byte = asMap(col.toLowerCase(Locale.ROOT)).asInstanceOf[Byte]
+    def byte(col: String): Byte = byteOpt(col).get
 
     def shortOpt(col: String): Option[Short] = Option(asMap(col.toLowerCase(Locale.ROOT))).map(_.asInstanceOf[Short])
 
