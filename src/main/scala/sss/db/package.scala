@@ -246,7 +246,7 @@ package object db {
 
     private def shimObjectToByte(o: Any): Byte = {
       val aryByte = o.asInstanceOf[Array[Byte]]
-      assert(aryByte.length == 1)
+      require(aryByte.length == 1)
       aryByte(0)
     }
 
