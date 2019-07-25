@@ -33,16 +33,13 @@ trait DbConfig {
 
 class Db(dbConfig: DbConfig)(private[db] val ds:CloseableDataSource) extends Logging with Dynamic with Tx {
 
-  private lazy val viewCache  = new SynchronizedLruMap[String, View](dbConfig.viewCachesSize)
-  private lazy val tableCache = new SynchronizedLruMap[String, Table](dbConfig.viewCachesSize)
-
   if(dbConfig.useShutdownHook) sys addShutdownHook shutdown
 
   DbInitialSqlExecutor(dbConfig: DbConfig, executeSql _)
 
   def selectDynamic(tableName: String) = table(tableName)
 
-  def table(name: String): Table =  tableCache.getOrElseUpdate(name, new Table(name, ds, dbConfig.freeBlobsEarly))
+  def table(name: String): Table =  new Table(name, ds, dbConfig.freeBlobsEarly)
 
   /*
   Views - they're great!
@@ -56,7 +53,7 @@ class Db(dbConfig: DbConfig)(private[db] val ds:CloseableDataSource) extends Log
 
   TL;DR for blockchain type applications views are a good solution.
    */
-  def view(name: String): View = viewCache.getOrElseUpdate(name, new View(name, ds, dbConfig.freeBlobsEarly))
+  def view(name: String): View = new View(name, ds, dbConfig.freeBlobsEarly)
 
   def dropView(viewName: String) = executeSql(s"DROP VIEW ${viewName}")
 
@@ -76,7 +73,7 @@ class Db(dbConfig: DbConfig)(private[db] val ds:CloseableDataSource) extends Log
     * @return
     * @note This is a gateway for sql injection attacks, use with extreme caution.
     */
-  def executeSqls(sqls: Seq[String]): Seq[Int] = inTransaction(sqls.map(executeSql(_)))
+  def executeSqls(sqls: Seq[String]): Seq[Int] = inTransaction(sqls.map(executeSql))
 
   /**
     * Execute any sql you give it on a db connection in a transaction
