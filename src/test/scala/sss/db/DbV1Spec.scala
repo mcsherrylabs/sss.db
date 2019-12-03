@@ -262,4 +262,16 @@ class DbV1Spec extends DbSpecSetup {
     )
     assert(rows.head.id === 999999)
   }
+
+  it should "correctly filter using None syntax " in {
+    val time = new Date()
+    val table = fixture.dbUnderTest.table("testBinary")
+    table.insert(Map("byteVal" -> None ))
+
+    //val all = table.map(identity)
+    val rows = table.filter(where("byteVal" -> None) )
+    val rowsWorks = table.filter(where("byteVal IS NULL") )
+    assert(!rowsWorks.isEmpty)
+    assert(!rows.isEmpty)
+  }
 }
