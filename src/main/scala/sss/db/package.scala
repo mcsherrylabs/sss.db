@@ -7,6 +7,7 @@ import java.util
 import java.util.Locale
 import java.util.regex.Pattern
 
+import sss.db.IsNull.IsNull
 import sss.db.NullOrder.NullOrder
 
 import scala.collection.mutable
@@ -73,6 +74,13 @@ package object db {
   sealed case class LimitParams(page: Int, start: Option[Long] = None)
 
   type Limit = Option[LimitParams]
+
+  object IsNull extends Enumeration {
+    type IsNull = Value
+    val Null = Value(" IS NULL")
+    val NotNull = Value(" IS NOT NULL")
+  }
+
 
   object NullOrder extends Enumeration {
     type NullOrder = Value
@@ -142,6 +150,11 @@ package object db {
 
     def notIn(params: Set[_]): Where = in(params, true)
 
+    def is(p: IsNull): Where = {
+      val newClause = s"$clause$p"
+      copy(newClause, params)
+    }
+
     def in(params: Set[_], neg: Boolean = false): Where = {
       val str = Seq.fill(params.size)("?") mkString (",")
       val isNot = if (neg) " NOT" else ""
@@ -177,12 +190,21 @@ package object db {
 
   def where(sql: String, params: Any*): Where = new Where(sql, params.toSeq)
 
-  def where(tuples: (String, Any)*): Where = where(
-    tuples.foldLeft[(String, Seq[Any])](("", Seq()))((acc, e) =>
-      if (acc._1.isEmpty) (s"${e._1} = ?", acc._2 :+ e._2)
-      else (s"${acc._1}  AND ${e._1} = ?", acc._2 :+ e._2)
+
+  def where(tuples: (String, Any)*): Where =
+    where(
+      tuples.foldLeft[(String, Seq[Any])](("", Seq()))((acc, e) => (acc._1, e._2) match {
+        case ("", None) =>
+          (s"${e._1} IS NULL", acc._2)
+        case ("", _) =>
+          (s"${e._1} = ?", acc._2 :+ e._2)
+        case (_, None) =>
+          (s"${acc._1} AND ${e._1} IS NULL", acc._2)
+        case _ =>
+          (s"${acc._1} AND ${e._1} = ?", acc._2 :+ e._2)
+      })
     )
-  )
+
 
   import scala.reflect.runtime.universe._
 
@@ -193,7 +215,24 @@ package object db {
 
   class Row(val asMap: Map[String, _]) {
 
-    override def equals(o: Any) = o match {
+    def shallowEquals(that: Row): Boolean = {
+      asMap.forall {
+        case (k, _: Blob | _: InputStream) =>
+          that.asMap(k) match {
+            case _: Blob | _ :InputStream => true
+            case _ => false
+          }
+        case (k, v: Array[Byte]) =>
+          that.asMap(k) match {
+            case v2: Array[Byte] => util.Arrays.equals(v, v2)
+            case _ => false
+          }
+        case (k, v) =>
+          that.asMap(k) == v
+      }
+    }
+
+    override def equals(o: Any): Boolean = o match {
       case that: Row =>
         asMap.forall {
           case (k, v: Array[Byte]) =>
@@ -289,6 +328,16 @@ package object db {
 
     def blobByteArray(col: String): Array[Byte] = blobToBytes(asMap(col.toLowerCase(Locale.ROOT)).asInstanceOf[Blob])
 
+    def blobInputStreamOpt(col: String): Option[InputStream] =
+      Option(asMap(col.toLowerCase(Locale.ROOT))
+        .asInstanceOf[Blob])
+        .map(blobToStream)
+
+    def blobInputStream(col: String): InputStream = blobInputStreamOpt(col).get
+
+    def blob(col: String): Blob = blobOpt(col).get
+
+    def blobOpt(col: String): Option[Blob] = Option(asMap(col.toLowerCase(Locale.ROOT)).asInstanceOf[Blob])
 
     private def blobToStream(jDBCBlobClient: Blob): InputStream = jDBCBlobClient.getBinaryStream
 

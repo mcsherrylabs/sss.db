@@ -263,15 +263,48 @@ class DbV1Spec extends DbSpecSetup {
     assert(rows.head.id === 999999)
   }
 
+
   it should "correctly filter using None syntax " in {
     val time = new Date()
     val table = fixture.dbUnderTest.table("testBinary")
     table.insert(Map("byteVal" -> None ))
 
     //val all = table.map(identity)
-    val rows = table.filter(where("byteVal" -> None) )
+
+    val rows = table.filter(where("byteVal" -> None))
     val rowsWorks = table.filter(where("byteVal IS NULL") )
-    assert(!rowsWorks.isEmpty)
-    assert(!rows.isEmpty)
+    assert(rowsWorks.nonEmpty)
+    assert(rows.nonEmpty)
+    assert(rowsWorks == rows)
   }
+
+  it should "correctly filter using is Not Null syntax " in {
+    val time = new Date()
+    val table = fixture.dbUnderTest.table("testBinary")
+    table.insert(Map("byteVal" -> Some(3.toByte) ))
+
+    //val all = table.map(identity)
+    import IsNull._
+    val rows = table.filter(where("byteVal") is NotNull)
+    val rowsWorks = table.filter(where("byteVal IS NOT NULL") )
+    assert(rowsWorks.nonEmpty)
+    assert(rows.nonEmpty)
+    assert(rowsWorks == rows)
+  }
+
+  it should "correctly filter using is Null syntax " in {
+    val time = new Date()
+    val table = fixture.dbUnderTest.table("testBinary")
+    table.insert(Map("byteVal" -> None ))
+
+
+    //val all = table.map(identity)
+    import IsNull._
+    val rows = table.filter(where("byteVal") is Null)
+    val rowsWorks = table.filter(where("byteVal IS NULL") )
+    assert(rowsWorks.nonEmpty)
+    assert(rows.nonEmpty)
+    assert(rowsWorks == rows)
+  }
+
 }

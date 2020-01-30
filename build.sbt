@@ -1,7 +1,7 @@
 
 name := "sss-db"
 
-version := "0.9.38-SNAPSHOT"
+version := "0.9.39-SNAPSHOT"
 
 scalaVersion := "2.12.6"
 
@@ -23,7 +23,7 @@ libraryDependencies += "org.scalatest" %% "scalatest" % "3.0.5" % Test
 
 libraryDependencies += "org.hsqldb" % "hsqldb" % "2.4.1" % Test
 
-libraryDependencies += "com.mcsherrylabs" %% "sss-ancillary" % "1.5-SNAPSHOT"
+libraryDependencies += "com.mcsherrylabs" %% "sss-ancillary" % "1.7"
 
 libraryDependencies += "org.apache.commons" % "commons-dbcp2" % "2.0"
 

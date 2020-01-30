@@ -83,7 +83,7 @@ class RowSerializeSpec extends DbSpecSetup {
 
     val row2 = rowFromBytes(view.columnsMetaInfo, serialized)
 
-    assert(row === row2)
+    assert(row shallowEquals row2)
 
   }
 
@@ -110,7 +110,7 @@ class RowSerializeSpec extends DbSpecSetup {
 
     val row2 = rowFromBytes(view.columnsMetaInfo, serialized)
 
-    assert(row === row2)
+    assert(row shallowEquals row2)
 
   }
 
@@ -147,7 +147,10 @@ class RowSerializeSpec extends DbSpecSetup {
 
     val row2 = rowFromBytes(view.columnsMetaInfo, serialized)
 
-    assert(row === row2)
+    assert(row.int(int_col) === row2.int(int_col))
+    assert(row.intOpt(int_col_opt) === row2.intOpt(int_col_opt))
+    assert(row.shallowEquals(row2))
+
 
   }
 }

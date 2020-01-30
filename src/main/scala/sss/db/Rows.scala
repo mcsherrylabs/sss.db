@@ -34,16 +34,15 @@ object Rows {
           for (i <- 1 to colMax) {
 
             val colName = meta.getColumnName(i).toLowerCase(Locale.ROOT)
-            val o = rs.getObject(i)
+            rs.getObject(i) match {
+              case jDBCBlobClient: Blob if(freeBlobsEarly) =>
+                try {
+                  val asByteAry = jDBCBlobClient.getBytes(1, jDBCBlobClient.length.toInt)
+                  r += (colName -> asByteAry)
+                } finally jDBCBlobClient.free()
 
-            if (freeBlobsEarly && o.isInstanceOf[Blob]) {
-              val jDBCBlobClient = o.asInstanceOf[Blob]
-              try {
-                val asByteAry = jDBCBlobClient.getBytes(1, jDBCBlobClient.length.toInt)
-                r += (colName -> asByteAry)
-              } finally jDBCBlobClient.free()
-            } else {
-              r += (colName -> o)
+              case o =>
+                r += (colName -> o)
             }
           }
 

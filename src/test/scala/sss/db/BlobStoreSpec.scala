@@ -172,7 +172,7 @@ class BlobStoreSpec extends DbSpecSetup {
 
   }
 
-  it should " support inputstream result " in {
+  it should "support inputstream result" in {
 
     val testStr = "Hello My Friend"
     val table = fixture.dbUnderTest.testBinary
@@ -190,6 +190,23 @@ class BlobStoreSpec extends DbSpecSetup {
       assert(new String(readBytes) === testStr)
     }
 
+  }
+
+  it should "support blob result" in {
+
+    val testStr = "Hello My Friend"
+    val table = fixture.dbUnderTest.testBinary
+    val bytes = testStr.getBytes
+    table.persist(Map("blobVal" -> bytes))
+
+    val found = table.find(where("blobVal"->  bytes))
+    assert(found.isDefined)
+    val blob = found.get.blob("blobVal")
+    val readBytes = blob.getBytes(1, bytes.length)
+    blob.free()
+
+    assert(readBytes === bytes)
+    assert(new String(readBytes) === testStr)
   }
 
 }

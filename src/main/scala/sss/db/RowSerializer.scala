@@ -28,8 +28,8 @@ object RowSerializer {
         case (acc, ColumnMetaInfo(k, `BINARY` | `VARBINARY` | `LONGVARBINARY` , false)) => acc ++ OptionSerializer(row.arrayByteOpt(k), ByteArraySerializer)
         case (acc, ColumnMetaInfo(k, `BINARY` | `VARBINARY` | `LONGVARBINARY` , true)) => acc ++ ByteArraySerializer(row.arrayByte(k))
 
-        case (acc, ColumnMetaInfo(k, `BLOB` , false)) => acc ++ OptionSerializer(row.arrayByteOpt(k), ByteArraySerializer)
-        case (acc, ColumnMetaInfo(k, `BLOB` , true)) => acc ++ ByteArraySerializer(row.arrayByte(k))
+        case (acc, ColumnMetaInfo(k, `BLOB` , false)) => acc ++ OptionSerializer(row.blobInputStreamOpt(k), InputStreamSerializer)
+        case (acc, ColumnMetaInfo(k, `BLOB` , true)) => acc ++ InputStreamSerializer(row.blobInputStream(k))
 
         case (acc, colInfo) => DbException(s"Unsupported type ${colInfo}")
       }.toBytes
@@ -52,6 +52,7 @@ object RowSerializer {
                 case Some(o) => (o, restBytes)
                 case None => (null, restBytes)
               }
+
             case nonOpt =>
               val (deserialized, rest) = nonOpt.extract(nextBytes)
               (deserialized.payload, rest)
@@ -82,8 +83,8 @@ object RowSerializer {
     case ColumnMetaInfo(k, `BINARY` | `VARBINARY` | `LONGVARBINARY`, false) => OptionDeSerialize(ByteArrayDeSerialize)
     case ColumnMetaInfo(k, `BINARY` | `VARBINARY` | `LONGVARBINARY`, true) => ByteArrayDeSerialize
 
-    case ColumnMetaInfo(k, `BLOB`, false) => OptionDeSerialize(ByteArrayDeSerialize)
-    case ColumnMetaInfo(k, `BLOB`, true) => ByteArrayDeSerialize
+    case ColumnMetaInfo(k, `BLOB`, false) => OptionDeSerialize(InputStreamDeSerialize)
+    case ColumnMetaInfo(k, `BLOB`, true) => InputStreamDeSerialize
 
     case colInfo => DbException(s"Unsupported type ${colInfo}")
   }
