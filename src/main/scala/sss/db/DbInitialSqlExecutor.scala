@@ -4,7 +4,7 @@ import java.sql.SQLException
 import sss.ancillary.Logging
 
 import util.{Failure, Success, Try}
-import collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 object DbInitialSqlExecutor extends Logging {
 

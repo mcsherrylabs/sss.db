@@ -10,6 +10,7 @@ import java.util.regex.Pattern
 import sss.db.IsNull.IsNull
 import sss.db.NullOrder.NullOrder
 
+import scala.collection.immutable.ArraySeq
 import scala.collection.mutable
 import scala.collection.mutable.WrappedArray
 import scala.language.implicitConversions
@@ -48,7 +49,7 @@ package object db {
       BigDecimal with
       Byte with
       Double with
-      collection.mutable.WrappedArray[Byte] with
+      ArraySeq[Byte] with
       Array[Byte] with
       java.sql.Date with
       java.sql.Time with
@@ -260,10 +261,10 @@ package object db {
         None
       } else if (typeOf[T] == typeOf[Array[Byte]] && rawVal.isInstanceOf[Blob]) {
         blobToBytes(rawVal.asInstanceOf[Blob])
-      } else if (typeOf[T] == typeOf[mutable.WrappedArray[Byte]] && rawVal.isInstanceOf[Blob]) {
+      } else if (typeOf[T] == typeOf[ArraySeq[Byte]] && rawVal.isInstanceOf[Blob]) {
         blobToWrappedBytes(rawVal.asInstanceOf[Blob])
-      } else if (typeOf[T] == typeOf[mutable.WrappedArray[Byte]] && rawVal.isInstanceOf[Array[Byte]]) {
-        new WrappedArray.ofByte(rawVal.asInstanceOf[Array[Byte]])
+      } else if (typeOf[T] == typeOf[ArraySeq[Byte]] && rawVal.isInstanceOf[Array[Byte]]) {
+        (rawVal.asInstanceOf[Array[Byte]]).to(ArraySeq)
       } else if (typeOf[T] == typeOf[InputStream] && rawVal.isInstanceOf[Blob]) {
         blobToStream(rawVal.asInstanceOf[Blob])
       } else if (typeOf[T] == typeOf[Byte] && rawVal.isInstanceOf[Array[Byte]]) {
@@ -343,7 +344,7 @@ package object db {
 
     private def blobToBytes(jDBCBlobClient: Blob): Array[Byte] = jDBCBlobClient.getBytes(1, jDBCBlobClient.length.toInt)
 
-    private def blobToWrappedBytes(jDBCBlobClient: Blob): mutable.WrappedArray[Byte] = jDBCBlobClient.getBytes(1, jDBCBlobClient.length.toInt)
+    private def blobToWrappedBytes(jDBCBlobClient: Blob): ArraySeq[Byte] = jDBCBlobClient.getBytes(1, jDBCBlobClient.length.toInt).to(ArraySeq)
 
     override def toString: String = {
       asMap.foldLeft("") { case (a, (k, v)) => a + s" Key:${k}, Value: ${v}" }

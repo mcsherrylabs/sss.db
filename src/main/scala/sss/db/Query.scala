@@ -9,7 +9,7 @@ import javax.sql.DataSource
 import org.joda.time.LocalDate
 import sss.ancillary.Logging
 
-import scala.collection.mutable
+import scala.collection.{WithFilter, mutable}
 import scala.language.implicitConversions
 import scala.reflect.runtime.universe._
 
@@ -105,17 +105,17 @@ class Query private[db] (private val selectSql: String,
 
   def getRow(rowId: Long): Option[Row] = getRow(where(id -> rowId))
 
-  def map[B, W <% Where](f: Row => B, where: W = where()): QueryResults[B] = filter(where).map(f)
+  def map[B, W](f: Row => B, where: W = where())(implicit ev: W => Where): QueryResults[B] = filter(where).map(f)
 
-  def flatMap[B, W <% Where](f: Row => QueryResults[B], where: W = where()): QueryResults[B] = {
+  def flatMap[B, W](f: Row => QueryResults[B], where: W = where())(implicit ev: W => Where): QueryResults[B] = {
     map(identity, where)
       .foldLeft(List[B]())((acc,e) => acc ++ f(e))
       .toIndexedSeq
   }
 
-  def withFilter(f: Row => Boolean) = map(identity).withFilter(f)
+  def withFilter(f: Row => Boolean): WithFilter[Row, IndexedSeq] = map(identity).withFilter(f)
 
-  def foreach[W <% Where](f: Row => Unit, where: W = where()): Unit = map(f, where)
+  def foreach[W](f: Row => Unit, where: W = where())(implicit ev: W => Where): Unit = map(f, where)
 
   /**
     * Note - You can put ORDER BY into the Where clause ...

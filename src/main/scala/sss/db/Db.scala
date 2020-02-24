@@ -1,6 +1,6 @@
 package sss.db
 
-import com.twitter.util.SynchronizedLruMap
+
 import com.typesafe.config.Config
 import sss.ancillary.{DynConfig, Logging}
 import sss.db.datasource.DataSource

@@ -13,7 +13,7 @@ class ForComprehensionSpec extends DbSpecSetup {
     val rows = for {
       x <- (0 until 10)
       _ = fixture.dbUnderTest.table("testForComp").insert(x, x+1, "strId" + x)
-      rs: Rows <- (fixture.dbUnderTest.table("testForComp").toPaged(2)).toStream
+      rs: Rows <- (fixture.dbUnderTest.table("testForComp").toPaged(2)).to(LazyList)
       r        <- rs
       if(r[Int](idCol) == 1)
     } yield(r)
@@ -53,7 +53,7 @@ class ForComprehensionSpec extends DbSpecSetup {
     val allRows = for {
       name <- tableNames
       table = fixture.dbUnderTest.table(name)
-      rows <- table.toPaged(3).toIterator
+      rows <- table.toPaged(3).iterator
       row <- rows
       if (row[Int](idCol) == 1 || row[Int](idCol) == 9)
     } yield (row)

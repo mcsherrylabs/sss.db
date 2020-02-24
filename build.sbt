@@ -1,29 +1,29 @@
 
 name := "sss-db"
 
-version := "0.9.39-SNAPSHOT"
+version := "0.9.40-SNAPSHOT"
 
-scalaVersion := "2.12.6"
+scalaVersion := "2.13.1"
 
 updateOptions := updateOptions.value.withGigahorse(false)
 
 parallelExecution in Test := false
 
 //needed to retrieve ancillary, publish happens via global.sbt.
-resolvers += "stepsoft" at "http://nexus.mcsherrylabs.com/repository/releases/"
+resolvers += ("stepsoft" at "http://nexus.mcsherrylabs.com/repository/releases/").withAllowInsecureProtocol(true)
 
-resolvers += "stepsoft-snapshots" at "http://nexus.mcsherrylabs.com/repository/snapshots/"
+resolvers += ("stepsoft-snapshots" at "http://nexus.mcsherrylabs.com/repository/snapshots/").withAllowInsecureProtocol(true)
 
 dependencyOverrides += "org.scala-lang" % "scala-compiler" % scalaVersion.value
 
 //libraryDependencies += "joda-time" % "joda-time" % "2.9.9"
 
 // https://mvnrepository.com/artifact/org.scalatest/scalatest
-libraryDependencies += "org.scalatest" %% "scalatest" % "3.0.5" % Test
+libraryDependencies += "org.scalatest" %% "scalatest" % "3.2.0-M2" % Test
 
 libraryDependencies += "org.hsqldb" % "hsqldb" % "2.4.1" % Test
 
-libraryDependencies += "com.mcsherrylabs" %% "sss-ancillary" % "1.7"
+libraryDependencies += "com.mcsherrylabs" %% "sss-ancillary" % "1.10-SNAPSHOT"
 
 libraryDependencies += "org.apache.commons" % "commons-dbcp2" % "2.0"
 
@@ -31,4 +31,4 @@ libraryDependencies += "org.apache.commons" % "commons-pool2" % "2.2"
 
 libraryDependencies += "com.zaxxer" % "HikariCP" % "2.4.7"
 
-libraryDependencies += "com.twitter" %% "util-collection" % "18.5.0"
+

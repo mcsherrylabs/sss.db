@@ -6,6 +6,7 @@ import java.util
 
 import org.scalatest.DoNotDiscover
 
+import scala.collection.immutable.ArraySeq
 import scala.collection.mutable
 import scala.util.Random
 
@@ -23,7 +24,7 @@ object BlobStoreHelper {
     e
   }
 
-  def toStream(sizeInKb: Int): Stream[Array[Byte]] = Stream.tabulate(sizeInKb)(_ => elem)
+  def toStream(sizeInKb: Int): LazyList[Array[Byte]] = LazyList.tabulate(sizeInKb)(_ => elem)
 
   def createFile(sizeInKb: Int): File = {
 
@@ -33,7 +34,7 @@ object BlobStoreHelper {
   }
 
 
-  def writeBytes(data: Stream[Array[Byte]], file: File) = {
+  def writeBytes(data: LazyList[Array[Byte]], file: File) = {
     val target = new BufferedOutputStream(new FileOutputStream(file))
     try data.foreach(target.write) finally target.close
   }
@@ -77,7 +78,7 @@ class BlobStoreSpec extends DbSpecSetup {
     val bytes = new Array[Byte](KB)
 
     try {
-      Stream
+      LazyList
         .continually(is.read(bytes))
         .takeWhile(_ != -1)
         .foreach(read => os.write(bytes, 0, read))
@@ -93,7 +94,7 @@ class BlobStoreSpec extends DbSpecSetup {
     val bytes1 = new Array[Byte](KB)
     val bytes2 = new Array[Byte](KB)
 
-    Stream
+    LazyList
       .continually(f1.read(bytes1), f1.read(bytes2))
       .takeWhile(rr => rr._1 != -1 && rr._2 != -1)
       .foreach(_ => assert(util.Arrays.equals(bytes1, bytes2), "Read arrays did not match"))
@@ -132,11 +133,11 @@ class BlobStoreSpec extends DbSpecSetup {
 
     val testStr = "Hello My Friend"
     val table = fixture.dbUnderTest.testBinary
-    val wAry : mutable.WrappedArray[Byte] = testStr.getBytes
+    val wAry  = testStr.getBytes
     table.tx {
       val m = table.persist(Map("blobVal" -> wAry))
-      assert(m[mutable.WrappedArray[Byte]]("blobVal") === wAry)
-      assert(new String(m[mutable.WrappedArray[Byte]]("blobVal").array) === testStr)
+      assert(m[ArraySeq[Byte]]("blobVal") === wAry)
+      assert(new String(m[ArraySeq[Byte]]("blobVal").toArray) === testStr)
     }
 
   }
@@ -151,7 +152,8 @@ class BlobStoreSpec extends DbSpecSetup {
       val found = table.find(where("blobVal = ?", bytes))
       assert(found.isDefined)
       assert(found.get[Array[Byte]]("blobVal") === bytes)
-      assert(new String(found.get[mutable.WrappedArray[Byte]]("blobVal").array) === testStr)
+
+      assert(new String(found.get[ArraySeq[Byte]]("blobVal").toArray) === testStr)
     }
 
   }
@@ -160,14 +162,14 @@ class BlobStoreSpec extends DbSpecSetup {
 
     val testStr = "Hello My Friend"
     val table = fixture.dbUnderTest.testBinary
-    val wAry : mutable.WrappedArray[Byte] = testStr.getBytes
+    val wAry = testStr.getBytes
     val m = table.persist(Map("blobVal" -> wAry))
 
     table.tx {
       val found = table.find(where("blobVal = ?", wAry.array))
       assert(found.isDefined)
-      assert(found.get[mutable.WrappedArray[Byte]]("blobVal") === wAry)
-      assert(new String(found.get[mutable.WrappedArray[Byte]]("blobVal").array) === testStr)
+      assert(found.get[ArraySeq[Byte]]("blobVal") === wAry)
+      assert(new String(found.get[ArraySeq[Byte]]("blobVal").toArray) === testStr)
     }
 
   }

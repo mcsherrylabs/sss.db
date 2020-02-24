@@ -3,9 +3,10 @@ package sss.db
 import java.util.Date
 
 import org.scalatest._
-
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.flatspec.AnyFlatSpec
 @DoNotDiscover
-class SqlInterpolatorSpec extends FlatSpec with Matchers with BeforeAndAfter {
+class SqlInterpolatorSpec extends AnyFlatSpec with Matchers with BeforeAndAfter {
 
   it should " interpolate the string replacing the params with ? for prepared statements." in {
     val b = 56
