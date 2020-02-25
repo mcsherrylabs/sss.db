@@ -3,7 +3,12 @@ name := "sss-db"
 
 version := "0.9.40-SNAPSHOT"
 
-scalaVersion := "2.13.1"
+val scala213 = "2.13.1"
+
+scalaVersion := scala213
+
+//Can't if using new 2.13 features.
+//crossScalaVersions := Seq("2.12.10", scala213)
 
 updateOptions := updateOptions.value.withGigahorse(false)
 
