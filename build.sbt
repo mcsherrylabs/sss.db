@@ -1,9 +1,9 @@
 
 name := "sss-db"
 
-version := "0.9.40-SNAPSHOT"
+version := "0.9.41-SNAPSHOT"
 
-val scala213 = "2.13.1"
+val scala213 = "2.13.2"
 
 scalaVersion := scala213
 
@@ -28,12 +28,12 @@ libraryDependencies += "org.scalatest" %% "scalatest" % "3.2.0-M2" % Test
 
 libraryDependencies += "org.hsqldb" % "hsqldb" % "2.4.1" % Test
 
-libraryDependencies += "com.mcsherrylabs" %% "sss-ancillary" % "1.10-SNAPSHOT"
+libraryDependencies += "com.mcsherrylabs" %% "sss-ancillary" % "1.15-SNAPSHOT"
 
-libraryDependencies += "org.apache.commons" % "commons-dbcp2" % "2.0"
+libraryDependencies += "org.apache.commons" % "commons-dbcp2" % "2.7.0"
 
-libraryDependencies += "org.apache.commons" % "commons-pool2" % "2.2"
+libraryDependencies += "org.apache.commons" % "commons-pool2" % "2.8.0"
 
-libraryDependencies += "com.zaxxer" % "HikariCP" % "2.4.7"
+libraryDependencies += "com.zaxxer" % "HikariCP" % "3.4.5"
 
 
