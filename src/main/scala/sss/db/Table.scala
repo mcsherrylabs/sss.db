@@ -4,10 +4,10 @@ import java.sql.Statement
 
 import javax.sql.DataSource
 
-class Table private[db] ( name: String,
-             ds: DataSource,
-             freeBlobsEarly: Boolean,
-             columns: String = "*")
+class Table private[db](name: String,
+                        ds: DataSource,
+                        freeBlobsEarly: Boolean,
+                        columns: String = "*")
 
   extends View(
     name,
@@ -31,7 +31,7 @@ class Table private[db] ( name: String,
   @throws[DbOptimisticLockingException]("if the row has been updated after you read it")
   def update(values: Map[String, Any], where: Where, updateVersionCol: Boolean = false): Unit = inTransaction {
 
-    val params = values.keys.map (k => s"$k = ?").mkString(",")
+    val params = values.keys.map(k => s"$k = ?").mkString(",")
 
     val versionSql = if (updateVersionCol) ", version = version + 1" else ""
     val sql = s"UPDATE $name SET $params $versionSql ${where.sql}"
@@ -103,24 +103,23 @@ class Table private[db] ( name: String,
     * facilitate case classes with an id default value of 0 - it's considered an insert.
     *
     * @example
-    *          case class MyRecord(name : String, id: Int = 0)
-    *          val row = table.persist(MyRecord("Tony"))
-    *          val tony = MyRecord(row)
-    *          assert(tony.name == "Tony")
-    *          assert(tony.id != 0)
-    *          val updatedRow = table.persist(tony.copy(name = "Karl")
-    *          val karl = MyRecord(updatedRow)
-    *          assert(tony.id == karl.id)
-    *
+    * case class MyRecord(name : String, id: Int = 0)
+    * val row = table.persist(MyRecord("Tony"))
+    * val tony = MyRecord(row)
+    * assert(tony.name == "Tony")
+    * assert(tony.id != 0)
+    * val updatedRow = table.persist(tony.copy(name = "Karl")
+    * val karl = MyRecord(updatedRow)
+    * assert(tony.id == karl.id)
     * @param values
     * @return
     */
   def persist(values: Map[String, Any]): Row = inTransaction {
 
     values.partition(kv => id.equalsIgnoreCase(kv._1)) match {
-      case (mapWithId, rest) if(mapWithId.isEmpty)       => insert(rest)
-      case (mapWithId, rest) if(mapWithId.head._2 == 0L) => insert(rest)
-      case _                                             => updateRow(values)
+      case (mapWithId, rest) if (mapWithId.isEmpty) => insert(rest)
+      case (mapWithId, rest) if (mapWithId.head._2 == 0L) => insert(rest)
+      case _ => updateRow(values)
     }
   }
 

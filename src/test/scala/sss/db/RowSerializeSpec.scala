@@ -6,6 +6,9 @@ import org.scalatest.DoNotDiscover
 import RowSerializer._
 import sss.db.BlobStoreHelper._
 
+import scala.collection.immutable.ArraySeq
+
+//import scala.collection.immutable.ArraySeq
 import scala.util.Random
 
 /**
@@ -40,6 +43,13 @@ class RowSerializeSpec extends DbSpecSetup {
   val longvarbinary_col_opt = "longvarbinary_col_opt "
   val blob_col = "blob_col"
   val blob_col_opt = "blob_col_opt"
+
+  def randomByteArySeq(size: Int): ArraySeq[Byte] = {
+    val result = Array.ofDim[Byte](size)
+    Random.nextBytes(result)
+    ArraySeq.from(result)
+    //result
+  }
 
   def randomByteAry(size: Int): Array[Byte] = {
     val result = Array.ofDim[Byte](size)
@@ -99,9 +109,9 @@ class RowSerializeSpec extends DbSpecSetup {
       longvarchar_col -> "sdfsdfsdfsdf",
       bit_col -> true,
       bigint_col -> Long.MaxValue,
-      binary_col -> randomByteAry(30),
+      binary_col -> randomByteArySeq(30),
       varbinary_col -> randomByteAry(30),
-      longvarbinary_col -> randomByteAry(30),
+      longvarbinary_col -> randomByteArySeq(30),
       blob_col -> new FileInputStream(blobIn),
 
     ))

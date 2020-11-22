@@ -9,14 +9,15 @@ import javax.sql.DataSource
 import org.joda.time.LocalDate
 import sss.ancillary.Logging
 
-import scala.collection.{WithFilter, mutable}
-import scala.language.implicitConversions
-import scala.reflect.runtime.universe._
+import scala.collection.{mutable, WithFilter}
+//import scala.collection.IndexedSeq
+
+//import scala.language.implicitConversions
 
 
 /**
   *
-
+  *
   * @param ds
   * @param freeBlobsEarly
   *
@@ -25,11 +26,11 @@ import scala.reflect.runtime.universe._
   * can recover from is not by (my) definition an Exception!
   *
   */
-class Query private[db] (private val selectSql: String,
-            private[db] val ds: DataSource,
-            freeBlobsEarly: Boolean)
+class Query private[db](private val selectSql: String,
+                        private[db] val ds: DataSource,
+                        freeBlobsEarly: Boolean)
   extends Tx
-  with Logging {
+    with Logging {
 
   protected val id = "id"
   protected val version = "version"
@@ -62,7 +63,8 @@ class Query private[db] (private val selectSql: String,
       case v: Char => v
       case v: Byte => Array(v)
       case v: Array[Byte] => v
-      case v: mutable.WrappedArray[_] => v.array
+      //case v: mutable.WrappedArray[_] => v.array
+      case v: collection.IndexedSeq[Byte] => Array.from(v)
       case v: scala.math.BigDecimal => v.bigDecimal
       case v: scala.math.BigInt => v.bigInteger
       case v: Float => v
@@ -81,9 +83,9 @@ class Query private[db] (private val selectSql: String,
     ps
   }
 
-  private def tuplesToWhere(lookup:(String, Any)*): Where = {
+  private def tuplesToWhere(lookup: (String, Any)*): Where = {
     val asMap = lookup.toMap
-    val sqls = asMap.keys.map {k => s"$k = ?"}
+    val sqls = asMap.keys.map { k => s"$k = ?" }
     val sql = sqls.mkString(" AND ")
     new Where(sql, asMap.values.toSeq)
   }
@@ -109,7 +111,7 @@ class Query private[db] (private val selectSql: String,
 
   def flatMap[B, W](f: Row => QueryResults[B], where: W = where())(implicit ev: W => Where): QueryResults[B] = {
     map(identity, where)
-      .foldLeft(List[B]())((acc,e) => acc ++ f(e))
+      .foldLeft(List[B]())((acc, e) => acc ++ f(e))
       .toIndexedSeq
   }
 
@@ -151,19 +153,23 @@ class Query private[db] (private val selectSql: String,
     */
 
   def toIntId(lookup: (String, Any)*): Int = toIntIdOpt(lookup: _*).get
-  def toIntIdOpt(lookup: (String, Any)*): Option[Int] = find(lookup: _*) map(_.int(id))
-  def toIntIds(lookup: (String, Any)*): Seq[Int] = filter(lookup: _*) map(_.int(id))
 
-  def toLongId(lookup:(String, Any)*): Long = toLongIdOpt(lookup: _*).get
-  def toLongIdOpt(lookup:(String, Any)*): Option[Long] = find(lookup: _*) map(_.long(id))
-  def toLongIds(lookup:(String, Any)*): Seq[Long] = filter(lookup:_*) map(_.long(id))
+  def toIntIdOpt(lookup: (String, Any)*): Option[Int] = find(lookup: _*) map (_.int(id))
+
+  def toIntIds(lookup: (String, Any)*): Seq[Int] = filter(lookup: _*) map (_.int(id))
+
+  def toLongId(lookup: (String, Any)*): Long = toLongIdOpt(lookup: _*).get
+
+  def toLongIdOpt(lookup: (String, Any)*): Option[Long] = find(lookup: _*) map (_.long(id))
+
+  def toLongIds(lookup: (String, Any)*): Seq[Long] = filter(lookup: _*) map (_.long(id))
 
   def get(id: Long): Option[Row] = getRow(id)
 
   def page(start: Long, pageSize: Int, orderClauses: Seq[OrderBy] = Seq(OrderAsc("id"))): Rows = tx {
     val st = conn.createStatement()
     try {
-      val clause = where() orderBy(orderClauses:_*) limit(start, pageSize)
+      val clause = where() orderBy (orderClauses: _*) limit(start, pageSize)
       val rs = st.executeQuery(s"${selectSql} ${clause.sql}")
       Rows(rs, freeBlobsEarly)
     } finally st.close()

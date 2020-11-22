@@ -1,7 +1,7 @@
 
 name := "sss-db"
 
-version := "0.9.41-SNAPSHOT"
+version := "0.9.42-SNAPSHOT"
 
 val scala213 = "2.13.2"
 
