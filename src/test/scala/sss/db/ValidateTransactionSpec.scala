@@ -32,11 +32,15 @@ class ValidateTransactionSpec extends DbSpecSetup {
 
   "A bad Transaction" should "validate (to failure) without being persisted" in {
     val time = new Date()
+    val beforeCount = fixture.table.count
     fixture.table.validateTx {
-      val maxId = fixture.table.maxId
-      val row = fixture.table.insert(Map(("strId" -> "strId"), ("createTime" -> time), ("intVal" -> 67)))
-      val newMaxId = fixture.table(row.id).id
-      assert(maxId + 1 == newMaxId)
+      val newMaxId = fixture.table.inTransaction {
+        val maxId = fixture.table.maxId
+        val row = fixture.table.insert(Map(("strId" -> "strId"), ("createTime" -> time), ("intVal" -> 67)))
+        val newMaxId = fixture.table(row.id).id
+        assert(maxId + 1 == newMaxId)
+        newMaxId
+      }
       fixture.table(newMaxId + 1) // <- cannot exist
     } match {
       case Failure(e: DbException) => //println(e)
@@ -45,6 +49,7 @@ class ValidateTransactionSpec extends DbSpecSetup {
         fail("Should have failed")
       }
     }
+    assert(beforeCount == fixture.table.count, "Failed should not be present")
   }
 
   "The table " should "support altering the next id sequence to the max id in table plus 1" in {

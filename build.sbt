@@ -1,7 +1,7 @@
 
 name := "sss-db"
 
-version := "0.9.42-SNAPSHOT"
+version := "0.9.43-SNAPSHOT"
 
 val scala213 = "2.13.2"
 
@@ -26,7 +26,7 @@ dependencyOverrides += "org.scala-lang" % "scala-compiler" % scalaVersion.value
 // https://mvnrepository.com/artifact/org.scalatest/scalatest
 libraryDependencies += "org.scalatest" %% "scalatest" % "3.2.0-M2" % Test
 
-libraryDependencies += "org.hsqldb" % "hsqldb" % "2.4.1" % Test
+libraryDependencies += "org.hsqldb" % "hsqldb" % "2.5.1" % Test
 
 libraryDependencies += "com.mcsherrylabs" %% "sss-ancillary" % "1.15-SNAPSHOT"
 
