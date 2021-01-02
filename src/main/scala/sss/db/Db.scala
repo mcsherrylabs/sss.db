@@ -1,7 +1,6 @@
 package sss.db
 
 
-//import com.twitter.util.SynchronizedLruMap
 import com.typesafe.config.Config
 import sss.ancillary.{DynConfig, Logging, LoggingFutureSupport}
 import sss.db.TxIsolationLevel.TxIsolationLevel

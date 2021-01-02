@@ -30,3 +30,4 @@ testconn.script
 .settings
 .classpath
 .cache-*
+.bsp

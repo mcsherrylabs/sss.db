@@ -6,23 +6,17 @@ import java.util
 import org.scalatest.DoNotDiscover
 
 import java.nio.charset.StandardCharsets
+import scala.collection.immutable.ArraySeq
 import scala.collection.mutable
 import scala.util.Random
 
 
-/**
-  * Created by alan on Feb 19.
-  */
-@DoNotDiscover
-class BlobStoreSpec extends DbSpecSetup {
+object BlobStoreHelper {
 
-
-  def writeBytes(data: Stream[Array[Byte]], file: File) = {
-    val target = new BufferedOutputStream(new FileOutputStream(file))
-    try data.foreach(target.write) finally target.close
-  }
 
   val KB = 1024
+
+  val rootFolder = Files.createTempDirectory("").toFile // new File("/extra/home/alan")
 
   lazy val elem = {
     val e = new Array[Byte](KB)
@@ -30,9 +24,7 @@ class BlobStoreSpec extends DbSpecSetup {
     e
   }
 
-  val rootFolder = new File("/extra/home/alan") //Files.createTempDirectory("").toFile //
-
-  def toStream(sizeInKb: Int): Stream[Array[Byte]] = Stream.tabulate(sizeInKb)(_ => elem)
+  def toStream(sizeInKb: Int): LazyList[Array[Byte]] = LazyList.tabulate(sizeInKb)(_ => elem)
 
   def createFile(sizeInKb: Int): File = {
 
@@ -41,25 +33,42 @@ class BlobStoreSpec extends DbSpecSetup {
     f
   }
 
+
+  def writeBytes(data: LazyList[Array[Byte]], file: File) = {
+    val target = new BufferedOutputStream(new FileOutputStream(file))
+    try data.foreach(target.write) finally target.close
+  }
+
+}
+/**
+  * Created by alan on Feb 19.
+  */
+@DoNotDiscover
+class BlobStoreSpec extends DbSpecSetup {
+
+
+  import BlobStoreHelper._
+
   it should "support writing File to BLOB" in {
 
     val db = fixture.dbUnderTest
     import db.runContext.ds
     val start = System.currentTimeMillis()
 
-    val numKB = KB * 10
-    val table = fixture.dbUnderTest.table("testBinary")
-    val fIn = createFile(numKB)
+    val numB = KB * 10
+    val table = fixture.dbUnderTest.testBinary
+    val fIn = createFile(numB)
     fIn.deleteOnExit()
 
     val startWrite = System.currentTimeMillis()
+    println(s"Setup/Create ${numB} KB file took ${startWrite-start} ms")
     println(s"Setup/Create ${numKB} KB file took ${startWrite - start} ms")
 
     val in = new FileInputStream(fIn)
     val index = table.insert(Map("blobVal" -> in)).runSyncUnSafe
 
     val writeDone = System.currentTimeMillis()
-    println(s"Write ${numKB} KB file to db took ${writeDone - startWrite} ms")
+    println(s"Write ${numB} KB file to db took ${writeDone - startWrite} ms")
 
     val found = table.get(index.id).runSyncUnSafe
     assert(found.isDefined)
@@ -72,7 +81,7 @@ class BlobStoreSpec extends DbSpecSetup {
     val bytes = new Array[Byte](KB)
 
     try {
-      Stream
+      LazyList
         .continually(is.read(bytes))
         .takeWhile(_ != -1)
         .foreach(read => os.write(bytes, 0, read))
@@ -81,14 +90,14 @@ class BlobStoreSpec extends DbSpecSetup {
     }
 
     val readDone = System.currentTimeMillis()
-    println(s"Read ${numKB} KBfile from db took ${readDone - writeDone} ms")
+    println(s"Read ${numB} KBfile from db took ${readDone - writeDone} ms")
 
     val f1 = new FileInputStream(fIn)
     val f2 = new FileInputStream(fOut)
     val bytes1 = new Array[Byte](KB)
     val bytes2 = new Array[Byte](KB)
 
-    Stream
+    LazyList
       .continually(f1.read(bytes1), f1.read(bytes2))
       .takeWhile(rr => rr._1 != -1 && rr._2 != -1)
       .foreach(_ => assert(util.Arrays.equals(bytes1, bytes2), "Read arrays did not match"))
@@ -196,7 +205,7 @@ class BlobStoreSpec extends DbSpecSetup {
 
   }
 
-  it should " support inputstream result " in {
+  it should "support inputstream result" in {
 
     val db = fixture.dbUnderTest
     import db.runContext.ds
@@ -222,3 +231,21 @@ class BlobStoreSpec extends DbSpecSetup {
 
 }
 
+  it should "support blob result" in {
+
+    val testStr = "Hello My Friend"
+    val table = fixture.dbUnderTest.testBinary
+    val bytes = testStr.getBytes
+    table.persist(Map("blobVal" -> bytes))
+
+    val found = table.find(where("blobVal"->  bytes))
+    assert(found.isDefined)
+    val blob = found.get.blob("blobVal")
+    val readBytes = blob.getBytes(1, bytes.length)
+    blob.free()
+
+    assert(readBytes === bytes)
+    assert(new String(readBytes) === testStr)
+  }
+
+}

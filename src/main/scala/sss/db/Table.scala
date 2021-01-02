@@ -110,15 +110,14 @@ class Table private[db] (name: String,
     * facilitate case classes with an id default value of 0 - it's considered an insert.
     *
     * @example
-    *          case class MyRecord(name : String, id: Int = 0)
-    *          val row = table.persist(MyRecord("Tony"))
-    *          val tony = MyRecord(row)
-    *          assert(tony.name == "Tony")
-    *          assert(tony.id != 0)
-    *          val updatedRow = table.persist(tony.copy(name = "Karl")
-    *          val karl = MyRecord(updatedRow)
-    *          assert(tony.id == karl.id)
-    *
+    * case class MyRecord(name : String, id: Int = 0)
+    * val row = table.persist(MyRecord("Tony"))
+    * val tony = MyRecord(row)
+    * assert(tony.name == "Tony")
+    * assert(tony.id != 0)
+    * val updatedRow = table.persist(tony.copy(name = "Karl")
+    * val karl = MyRecord(updatedRow)
+    * assert(tony.id == karl.id)
     * @param values
     * @return
     */

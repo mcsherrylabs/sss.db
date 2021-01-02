@@ -1,7 +1,9 @@
 
 name := "sss-db"
 
-version := "0.9.37-SNAPSHOT"
+version := "0.9.43-SNAPSHOT"
+
+val scala213 = "2.13.2"
 
 scalaVersion := "2.13.4"
 
@@ -21,7 +23,7 @@ dependencyOverrides += "org.scala-lang" % "scala-compiler" % scalaVersion.value
 // https://mvnrepository.com/artifact/org.scalatest/scalatest
 libraryDependencies += "org.scalatest" %% "scalatest" % "3.2.2" % Test
 
-libraryDependencies += "org.hsqldb" % "hsqldb" % "2.4.1" % Test
+libraryDependencies += "org.hsqldb" % "hsqldb" % "2.5.1" % Test
 
 val excludeJetty = ExclusionRule(organization = "org.eclipse.jetty.aggregate")
 
@@ -31,6 +33,6 @@ libraryDependencies += "org.apache.commons" % "commons-dbcp2" % "2.8.0"
 
 libraryDependencies += "org.apache.commons" % "commons-pool2" % "2.9.0"
 
-libraryDependencies += "com.zaxxer" % "HikariCP" % "2.4.7"
+libraryDependencies += "com.zaxxer" % "HikariCP" % "3.4.5"
 
-//libraryDependencies += "com.twitter" %% "util-collection" % "19.1.0"
+

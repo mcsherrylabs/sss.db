@@ -31,6 +31,8 @@ private case class PageImpl private(indexCol: String,
 
   lazy private val firstIndexInPage = rows.head[Number](indexCol).longValue
   lazy private val lastIndexInPage = rows.last[Number](indexCol).longValue
+  private val firstIndexInPage = rows.head.number(indexCol).longValue
+  private val lastIndexInPage = rows.last.number(indexCol).longValue
 
   lazy override val next: FutureTx[Option[Page]] = {
     nextRows.map(rs =>

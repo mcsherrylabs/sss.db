@@ -40,7 +40,7 @@ package object db extends Logging {
 
 
   type SimpleColumnTypes =
-    String with
+      String with
       Long with
       Short with
       Integer with
@@ -211,6 +211,13 @@ package object db extends Logging {
 
   type Limit = Option[LimitParams]
 
+  object IsNull extends Enumeration {
+    type IsNull = Value
+    val Null = Value(" IS NULL")
+    val NotNull = Value(" IS NOT NULL")
+  }
+
+
   object NullOrder extends Enumeration {
     type NullOrder = Value
     val NullsFirst = Value("NULLS FIRST")
@@ -220,7 +227,7 @@ package object db extends Logging {
   trait OrderBy {
     val regex = "^[a-zA-Z_][a-zA-Z0-9_]*$"
     val colName: String
-    val pattern: Pattern = Pattern.compile(regex)
+    val pattern = Pattern.compile(regex)
     require(pattern.matcher(colName).matches(), s"Column name must conform to pattern $regex")
   }
 
@@ -279,9 +286,14 @@ package object db extends Logging {
 
     def notIn(params: Set[_]): Where = in(params, true)
 
+    def is(p: IsNull): Where = {
+      val newClause = s"$clause$p"
+      copy(newClause, params)
+    }
+
     def in(params: Set[_], neg: Boolean = false): Where = {
-      val str = Seq.fill(params.size)("?") mkString ","
-      val isNot = if (neg) " NOT" else ""
+      val str = Seq.fill(params.size)("?") mkString(",")
+      val isNot = if(neg) " NOT" else ""
       val newClause = s"$clause$isNot IN ($str)"
       copy(newClause, this.params ++ params)
     }
@@ -317,51 +329,87 @@ package object db extends Logging {
 
   def where(sql: String, params: Any*): Where = new Where(sql, params.toSeq)
 
-  def where(tuples: (String, Any)*): Where = where(
-    tuples.foldLeft[(String, Seq[Any])](("", Seq()))((acc, e) =>
-      if (acc._1.isEmpty) (s"${
-        e._1
-      } = ?", acc._2 :+ e._2)
-      else (s"${
-        acc._1
-      }  AND ${
-        e._1
-      } = ?", acc._2 :+ e._2)
+
+  def where(tuples: (String, Any)*): Where =
+    where(
+      tuples.foldLeft[(String, Seq[Any])](("", Seq()))((acc, e) => (acc._1, e._2) match {
+        case ("", None) =>
+          (s"${e._1} IS NULL", acc._2)
+        case ("", _) =>
+          (s"${e._1} = ?", acc._2 :+ e._2)
+        case (_, None) =>
+          (s"${acc._1} AND ${e._1} IS NULL", acc._2)
+        case _ =>
+          (s"${acc._1} AND ${e._1} = ?", acc._2 :+ e._2)
+      })
     )
-  )
+
 
   import scala.reflect.runtime.universe._
 
-  implicit class Row(val asMap: Map[String, _]) {
 
-    override def equals(o: Any) = o match {
-      case that: Row => that.asMap.equals(asMap)
+  case class ColumnMetaInfo(name: String, `type`: Int, noNullsAllowed: Boolean)
+
+  type ColumnsMetaInfo = Seq[ColumnMetaInfo]
+
+  class Row(val asMap: Map[String, _]) {
+
+    def shallowEquals(that: Row): Boolean = {
+      asMap.forall {
+        case (k, _: Blob | _: InputStream) =>
+          that.asMap(k) match {
+            case _: Blob | _ :InputStream => true
+            case _ => false
+          }
+        case (k, v: Array[Byte]) =>
+          that.asMap(k) match {
+            case v2: Array[Byte] => util.Arrays.equals(v, v2)
+            case _ => false
+          }
+        case (k, v) =>
+          that.asMap(k) == v
+      }
+    }
+
+    override def equals(o: Any): Boolean = o match {
+      case that: Row =>
+        asMap.forall {
+          case (k, v: Array[Byte]) =>
+            that.asMap(k) match {
+              case v2: Array[Byte] => util.Arrays.equals(v, v2)
+              case _ => false
+            }
+          case (k, v) =>
+            that.asMap(k) == v
+        }
       case x => false
     }
 
-    def id: Long = apply[Long]("id")
+    def id: Long = long("id")
 
     override def hashCode = asMap.hashCode
 
-    def get(col: String) = asMap(col.toLowerCase)
+    def get(col: String) = asMap(col.toLowerCase(Locale.ROOT))
 
+    @deprecated("Use string(), int(), long() etc. instead.", "1.5-SNAPSHOT")
     def apply[T >: ColumnTypes : TypeTag](col: String): T = {
 
-      val rawVal = asMap(col.toLowerCase)
+      val rawVal = asMap(col.toLowerCase(Locale.ROOT))
       val massaged = if (typeOf[T] <:< typeOf[Option[_]] && rawVal == null) {
         None
       } else if (typeOf[T] == typeOf[Array[Byte]] && rawVal.isInstanceOf[Blob]) {
         blobToBytes(rawVal.asInstanceOf[Blob])
+      } else if (typeOf[T] == typeOf[ArraySeq[Byte]] && rawVal.isInstanceOf[Blob]) {
       } else if (typeOf[T] == typeOf[mutable.ArraySeq[Byte]] && rawVal.isInstanceOf[Blob]) {
         blobToWrappedBytes(rawVal.asInstanceOf[Blob])
+      } else if (typeOf[T] == typeOf[ArraySeq[Byte]] && rawVal.isInstanceOf[Array[Byte]]) {
+        (rawVal.asInstanceOf[Array[Byte]]).to(ArraySeq)
       } else if (typeOf[T] == typeOf[mutable.ArraySeq[Byte]] && rawVal.isInstanceOf[Array[Byte]]) {
         new mutable.ArraySeq.ofByte(rawVal.asInstanceOf[Array[Byte]])
       } else if (typeOf[T] == typeOf[InputStream] && rawVal.isInstanceOf[Blob]) {
         blobToStream(rawVal.asInstanceOf[Blob])
       } else if (typeOf[T] == typeOf[Byte] && rawVal.isInstanceOf[Array[Byte]]) {
-        val aryByte = rawVal.asInstanceOf[Array[Byte]]
-        assert(aryByte.length == 1)
-        aryByte(0)
+        shimObjectToByte(rawVal)
       } else if (typeOf[T] == typeOf[InputStream] && rawVal.isInstanceOf[Array[Byte]]) {
         val aryByte = rawVal.asInstanceOf[Array[Byte]]
         new ByteArrayInputStream(aryByte)
@@ -376,20 +424,68 @@ package object db extends Logging {
       massaged.asInstanceOf[T]
     }
 
-    def string(col:String): String = asMap(col.toLowerCase).asInstanceOf[String]
-    def longOpt(col:String): Option[Long] = Option(asMap(col.toLowerCase)) map (_.asInstanceOf[Long])
-    def long(col:String): Long = asMap(col.toLowerCase).asInstanceOf[Long]
-    def intOpt(col:String): Option[Int] = Option(asMap(col.toLowerCase)) map (_.asInstanceOf[Int])
-    def int(col:String): Int = asMap(col.toLowerCase).asInstanceOf[Int]
-    def arrayByte(col:String): Array[Byte] = asMap(col.toLowerCase).asInstanceOf[Array[Byte]]
-    def blobByte(col:String): Array[Byte] = blobToBytes(asMap(col.toLowerCase).asInstanceOf[Blob])
 
+    private def shimObjectToByte(o: Any): Byte = {
+      val aryByte = o.asInstanceOf[Array[Byte]]
+      require(aryByte.length == 1)
+      aryByte(0)
+    }
+
+    def number(col: String): Number = asMap(col.toLowerCase(Locale.ROOT)).asInstanceOf[Number]
+
+    def stringOpt(col: String): Option[String] = Option(asMap(col.toLowerCase(Locale.ROOT))).map(_.asInstanceOf[String])
+
+    def string(col: String): String = stringOpt(col).get
+
+    def longOpt(col: String): Option[Long] = Option(asMap(col.toLowerCase(Locale.ROOT))).map(_.asInstanceOf[Long])
+
+    def long(col: String): Long = longOpt(col).get
+
+    def intOpt(col: String): Option[Int] = Option(asMap(col.toLowerCase(Locale.ROOT))).map(_.asInstanceOf[Int])
+
+    def int(col: String): Int = intOpt(col).get
+
+    def bigDecimal(col: String): BigDecimal = bigDecimalOpt(col).get
+
+    def bigDecimalOpt(col: String): Option[BigDecimal] = Option(asMap(col.toLowerCase(Locale.ROOT))).map(_.asInstanceOf[BigDecimal])
+
+
+    def byteOpt(col: String): Option[Byte] = Option(asMap(col.toLowerCase(Locale.ROOT))).map(shimObjectToByte)
+
+    def byte(col: String): Byte = byteOpt(col).get
+
+    def shortOpt(col: String): Option[Short] = Option(asMap(col.toLowerCase(Locale.ROOT))).map(_.asInstanceOf[Short])
+
+    def short(col: String): Short = asMap(col.toLowerCase(Locale.ROOT)).asInstanceOf[Short]
+
+    def booleanOpt(col: String): Option[Boolean] = Option(asMap(col.toLowerCase(Locale.ROOT))).map(_.asInstanceOf[Boolean])
+
+    def boolean(col: String): Boolean = asMap(col.toLowerCase(Locale.ROOT)).asInstanceOf[Boolean]
+
+    def arrayByteOpt(col: String): Option[Array[Byte]] = Option(asMap(col.toLowerCase(Locale.ROOT))).map(_.asInstanceOf[Array[Byte]])
+
+    def arrayByte(col: String): Array[Byte] = asMap(col.toLowerCase(Locale.ROOT)).asInstanceOf[Array[Byte]]
+
+    def blobByteArrayOpt(col: String): Option[Array[Byte]] = Option(asMap(col.toLowerCase(Locale.ROOT)).asInstanceOf[Blob]).map(blobToBytes)
+
+    def blobByteArray(col: String): Array[Byte] = blobToBytes(asMap(col.toLowerCase(Locale.ROOT)).asInstanceOf[Blob])
+
+    def blobInputStreamOpt(col: String): Option[InputStream] =
+      Option(asMap(col.toLowerCase(Locale.ROOT))
+        .asInstanceOf[Blob])
+        .map(blobToStream)
+
+    def blobInputStream(col: String): InputStream = blobInputStreamOpt(col).get
+
+    def blob(col: String): Blob = blobOpt(col).get
+
+    def blobOpt(col: String): Option[Blob] = Option(asMap(col.toLowerCase(Locale.ROOT)).asInstanceOf[Blob])
 
     private def blobToStream(jDBCBlobClient: Blob): InputStream = jDBCBlobClient.getBinaryStream
 
     private def blobToBytes(jDBCBlobClient: Blob): Array[Byte] = jDBCBlobClient.getBytes(1, jDBCBlobClient.length.toInt)
 
-    private def blobToWrappedBytes(jDBCBlobClient: Blob): mutable.WrappedArray[Byte] = jDBCBlobClient.getBytes(1, jDBCBlobClient.length.toInt)
+    private def blobToWrappedBytes(jDBCBlobClient: Blob): ArraySeq[Byte] = jDBCBlobClient.getBytes(1, jDBCBlobClient.length.toInt).to(ArraySeq)
 
     override def toString: String = {
       asMap.foldLeft("") { case (a, (k, v)) => a + s" Key:$k, Value: $v" }

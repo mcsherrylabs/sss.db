@@ -4,6 +4,8 @@ import org.scalatest._
 import org.scalatest.flatspec.{AnyFlatSpec, AsyncFlatSpec}
 import org.scalatest.matchers.should.Matchers
 import sss.db.datasource.DataSource
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.flatspec.{AnyFlatSpec, AsyncFlatSpec}
 
 trait DbSpecSetupBase extends Matchers with BeforeAndAfter {
 
@@ -19,6 +21,7 @@ trait DbSpecSetupBase extends Matchers with BeforeAndAfter {
   val statusCol = "status_col"
   val testPaged = "testPaged"
   val testPaged2 = "testPaged2"
+  val testRowSerialize = "testRowSerialize"
 
   before {
     val dbUnderTest = Db(dbConfigName, DataSource(s"$dbConfigName.datasource"))

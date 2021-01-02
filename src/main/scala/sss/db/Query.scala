@@ -12,11 +12,15 @@ import scala.collection.WithFilter
 import scala.collection.mutable
 import scala.language.implicitConversions
 import scala.reflect.runtime.universe._
+import scala.collection.{mutable, WithFilter}
+//import scala.collection.IndexedSeq
+
+//import scala.language.implicitConversions
 
 
 /**
   *
-
+  *
   * @param ds
   * @param freeBlobsEarly
   *
@@ -35,6 +39,19 @@ class Query private[db] (private val selectSql: String,
   protected val id = "id"
   protected val version = "version"
 
+
+  def noNullsAllowed(col: String): Boolean =
+    columnsMetaInfo.exists(e => e.name == col && e.noNullsAllowed)
+
+  lazy val columnsMetaInfo: ColumnsMetaInfo = tx {
+    val st = conn.createStatement()
+    try {
+
+      val rs = st.executeQuery(s"$selectSql")
+      Rows.columnsMetaInfo(rs.getMetaData)
+    } finally st.close()
+  }
+
   private[db] def mapToSql(value: Any): Any = {
     value match {
       case v: String => v //s"'${v}'"
@@ -47,9 +64,11 @@ class Query private[db] (private val selectSql: String,
       case v: Int => v
       case v: Long => v
       case v: Double => v
+      case v: Char => v
       case v: Byte => Array(v)
       case v: Array[Byte] => v
-      case v: mutable.WrappedArray[_] => v.array
+      //case v: mutable.WrappedArray[_] => v.array
+      case v: collection.IndexedSeq[Byte] => Array.from(v)
       case v: scala.math.BigDecimal => v.bigDecimal
       case v: scala.math.BigInt => v.bigInteger
       case v: Float => v
@@ -73,9 +92,9 @@ class Query private[db] (private val selectSql: String,
     }(context.ec)
   }
 
-  private def tuplesToWhere(lookup:(String, Any)*): Where = {
+  private def tuplesToWhere(lookup: (String, Any)*): Where = {
     val asMap = lookup.toMap
-    val sqls = asMap.keys.map {k => s"$k = ?"}
+    val sqls = asMap.keys.map { k => s"$k = ?" }
     val sql = sqls.mkString(" AND ")
     new Where(sql, asMap.values.toSeq)
   }
@@ -151,22 +170,19 @@ class Query private[db] (private val selectSql: String,
     * @return
     */
 
-  def toIdOpt[T >: Long with Int: TypeTag](lookup: (String, Any)*): FutureTx[Option[T]] =
-    find(lookup: _*).map(_.map(_[T](id)))
+  def toIntId(lookup: (String, Any)*): Int = toIntIdOpt(lookup: _*).get
 
-  def toId[T >: Long with Int: TypeTag](lookup: (String, Any)*): FutureTx[T] =
-    toIdOpt[T](lookup: _*).map(_.get)
+  def toIntIdOpt(lookup: (String, Any)*): Option[Int] = find(lookup: _*) map (_.int(id))
 
-  def toIds[T >: Long with Int: TypeTag](lookup: (String, Any)*): FutureTx[Seq[T]] =
-    filter(lookup: _*).map(_.map(_[T](id)))
+  def toIntIds(lookup: (String, Any)*): Seq[Int] = filter(lookup: _*) map (_.int(id))
 
-  def toIntId(lookup: (String, Any)*): FutureTx[Int] = toId[Int](lookup: _*)
-  def toIntIdOpt(lookup: (String, Any)*): FutureTx[Option[Int]] = toIdOpt[Int](lookup:_*)
-  def toIntIds(lookup: (String, Any)*): FutureTx[Seq[Int]] = toIds[Int](lookup:_*)
+  def toLongId(lookup: (String, Any)*): Long = toLongIdOpt(lookup: _*).get
 
-  def toLongId(lookup:(String, Any)*): FutureTx[Long] = toId[Long](lookup:_*)
-  def toLongIdOpt(lookup:(String, Any)*): FutureTx[Option[Long]] = toIdOpt[Long](lookup:_*)
-  def toLongIds(lookup:(String, Any)*): FutureTx[Seq[Long]] = toIds[Long](lookup:_*)
+  def toLongIdOpt(lookup: (String, Any)*): Option[Long] = find(lookup: _*) map (_.long(id))
+
+  def toLongIds(lookup: (String, Any)*): Seq[Long] = filter(lookup: _*) map (_.long(id))
+
+  def get(id: Long): Option[Row] = getRow(id)
 
   def get(id: Long): FutureTx[Option[Row]] = getRow(id)
 
@@ -183,7 +199,8 @@ class Query private[db] (private val selectSql: String,
 
   def toPaged(pageSize: Int,
               filter: Where = where(),
-              indexCol: String = "id"): PagedView =
+              indexCol: String = "id") =
     PagedView(this, pageSize, filter, indexCol)
+
 
 }
