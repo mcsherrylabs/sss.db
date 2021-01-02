@@ -3,9 +3,9 @@ package sss.db
 import java.io._
 import java.nio.file.Files
 import java.util
-
 import org.scalatest.DoNotDiscover
 
+import java.nio.charset.StandardCharsets
 import scala.collection.mutable
 import scala.util.Random
 
@@ -142,12 +142,12 @@ class BlobStoreSpec extends DbSpecSetup {
 
     val testStr = "Hello My Friend"
 
-    val wAry : mutable.WrappedArray[Byte] = testStr.getBytes
+    val wAry : Array[Byte] = testStr.getBytes
 
     val plan = for {
       m <- table.persist(Map("blobVal" -> wAry))
-      _ = assert(m[mutable.WrappedArray[Byte]]("blobVal") === wAry)
-      _ = assert(new String(m[mutable.WrappedArray[Byte]]("blobVal").array) === testStr)
+      _ = assert(m[Array[Byte]]("blobVal") === wAry)
+      _ = assert(new String(m[Array[Byte]]("blobVal").array) === testStr)
     } yield ()
 
     plan.runSyncUnSafe
@@ -167,7 +167,7 @@ class BlobStoreSpec extends DbSpecSetup {
       found <- table.find(where("blobVal = ?", bytes))
       _ = assert(found.isDefined)
       _ = assert(found.get[Array[Byte]]("blobVal") === bytes)
-      _ = assert(new String(found.get[mutable.WrappedArray[Byte]]("blobVal").array) === testStr)
+      _ = assert(new String(found.get[mutable.ArraySeq[Byte]]("blobVal").toArray, StandardCharsets.UTF_8) === testStr)
     } yield ()
 
     plan.runSyncUnSafe
@@ -182,14 +182,14 @@ class BlobStoreSpec extends DbSpecSetup {
 
     val testStr = "Hello My Friend"
 
-    val wAry : mutable.WrappedArray[Byte] = testStr.getBytes
+    val wAry : Array[Byte] = testStr.getBytes
 
     val plan = for {
       m <- table.persist(Map("blobVal" -> wAry))
       found <- table.find(where("blobVal = ?", wAry.array))
       _ = assert(found.isDefined)
-          _ =  assert(found.get[mutable.WrappedArray[Byte]]("blobVal") === wAry)
-      _ = assert(new String(found.get[mutable.WrappedArray[Byte]]("blobVal").array) === testStr)
+      _ =  assert(found.get[Array[Byte]]("blobVal") === wAry)
+      _ = assert(new String(found.get[Array[Byte]]("blobVal").array) === testStr)
     } yield ()
 
     plan.runSyncUnSafe

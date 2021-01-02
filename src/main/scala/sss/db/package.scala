@@ -1,13 +1,13 @@
 package sss
 
+import sss.ancillary.FutureOps.AwaitReady
+import sss.ancillary.Logging
+
 import java.io.{ByteArrayInputStream, InputStream}
 import java.math.BigDecimal
 import java.sql.{Blob, Connection}
 import java.util.regex.Pattern
-
 import javax.sql.DataSource
-import sss.ancillary.FutureOps._
-import sss.ancillary.Logging
 import sss.db.NullOrder.NullOrder
 import sss.db.TxIsolationLevel.TxIsolationLevel
 
@@ -50,7 +50,7 @@ package object db extends Logging {
       BigDecimal with
       Byte with
       Double with
-      collection.mutable.WrappedArray[Byte] with
+      mutable.ArraySeq[Byte] with
       Array[Byte] with
       java.sql.Date with
       java.sql.Time with
@@ -301,12 +301,15 @@ package object db extends Logging {
     def limit(page: Int): Where = copy(orderBys = orderBys.limit(page))
 
     private[db] def sql: String = {
-      val where = if (!clause.isEmpty) s" WHERE $clause" else ""
+      val where = if (clause.nonEmpty) s" WHERE $clause" else ""
       where + orderBys.sql
     }
   }
 
-  implicit def toWhere(orderBy: OrderBy): Where = new Where("", Seq.empty, OrderBys(orderBy))
+  object WhereOps {
+    implicit def toWhere(orderBy: OrderBy): Where = new Where("", Seq.empty, OrderBys(orderBy))
+  }
+
 
   def where(): Where = new Where("")
 
@@ -349,10 +352,10 @@ package object db extends Logging {
         None
       } else if (typeOf[T] == typeOf[Array[Byte]] && rawVal.isInstanceOf[Blob]) {
         blobToBytes(rawVal.asInstanceOf[Blob])
-      } else if (typeOf[T] == typeOf[mutable.WrappedArray[Byte]] && rawVal.isInstanceOf[Blob]) {
+      } else if (typeOf[T] == typeOf[mutable.ArraySeq[Byte]] && rawVal.isInstanceOf[Blob]) {
         blobToWrappedBytes(rawVal.asInstanceOf[Blob])
-      } else if (typeOf[T] == typeOf[mutable.WrappedArray[Byte]] && rawVal.isInstanceOf[Array[Byte]]) {
-        new mutable.WrappedArray.ofByte(rawVal.asInstanceOf[Array[Byte]])
+      } else if (typeOf[T] == typeOf[mutable.ArraySeq[Byte]] && rawVal.isInstanceOf[Array[Byte]]) {
+        new mutable.ArraySeq.ofByte(rawVal.asInstanceOf[Array[Byte]])
       } else if (typeOf[T] == typeOf[InputStream] && rawVal.isInstanceOf[Blob]) {
         blobToStream(rawVal.asInstanceOf[Blob])
       } else if (typeOf[T] == typeOf[Byte] && rawVal.isInstanceOf[Array[Byte]]) {

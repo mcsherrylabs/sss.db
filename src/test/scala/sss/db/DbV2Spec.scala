@@ -338,17 +338,17 @@ class DbV2Spec extends DbSpecSetup {
     val db = fixture.dbUnderTest
     import db.runContext.ds
     val table = db.table("testIntId")
-    val currentMax = table.maxId.runSyncUnSafe
+    val currentMax = table.maxId().runSyncUnSafe
 
     FutureTx.sequence(
     (0 until 10) map {_ => table.insert(Map("strVal" -> "manyhellos"))}
     ).runSyncUnSafe
 
-    assert(table.maxId.runSyncUnSafe == currentMax + 10)
+    assert(table.maxId().runSyncUnSafe == currentMax + 10)
 
     table.delete(where("id > 0")).runSyncUnSafe
 
-    assert(table.maxId.runSyncUnSafe == 0)
+    assert(table.maxId().runSyncUnSafe == 0)
 
     FutureTx.sequence(
       (0 until 10) map {_ => table.insert(Map("strVal" -> "manyhellos"))}
@@ -356,7 +356,7 @@ class DbV2Spec extends DbSpecSetup {
 
 
     assert(table.count.runSyncUnSafe == 10)
-    assert(table.maxId.runSyncUnSafe == currentMax + 20)
+    assert(table.maxId().runSyncUnSafe == currentMax + 20)
 
   }
 

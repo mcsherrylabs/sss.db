@@ -3,7 +3,7 @@ package sss.db
 import java.util.Date
 
 import org.scalatest.DoNotDiscover
-
+import sss.db.WhereOps.toWhere
 import scala.util.control.NonFatal
 
 @DoNotDiscover

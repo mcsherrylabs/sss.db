@@ -126,7 +126,7 @@ class Table private[db] (name: String,
 
     values.partition(kv => id.equalsIgnoreCase(kv._1)) match {
       case (mapWithId, rest) if mapWithId.isEmpty       => insert(rest)
-      case (mapWithId, rest) if mapWithId.head._2 == 0l => insert(rest)
+      case (mapWithId, rest) if mapWithId.head._2 == 0L => insert(rest)
       case _                                            => updateRow(values)
     }
   }

@@ -1,7 +1,7 @@
 package sss.db
 
 
-import com.twitter.util.SynchronizedLruMap
+//import com.twitter.util.SynchronizedLruMap
 import com.typesafe.config.Config
 import sss.ancillary.{DynConfig, Logging, LoggingFutureSupport}
 import sss.db.TxIsolationLevel.TxIsolationLevel
@@ -43,8 +43,6 @@ class Db(dbConfig: DbConfig)(closeableDataSource:CloseableDataSource, ec: Execut
   extends Logging
     with LoggingFutureSupport{
 
-  private lazy val viewCache  = new SynchronizedLruMap[String, View](dbConfig.viewCachesSize)
-  private lazy val tableCache = new SynchronizedLruMap[String, Table](dbConfig.viewCachesSize)
 
   if(dbConfig.useShutdownHook) sys addShutdownHook shutdown
 
@@ -54,7 +52,7 @@ class Db(dbConfig: DbConfig)(closeableDataSource:CloseableDataSource, ec: Execut
 
   def runContext(level: TxIsolationLevel): RunContext = new RunContext(closeableDataSource, ec, Option(level))
 
-  def table(name: String): Table =  tableCache.getOrElseUpdate(name, new Table(name, runContext, dbConfig.freeBlobsEarly))
+  def table(name: String): Table =  new Table(name, runContext, dbConfig.freeBlobsEarly)
 
   /*
   Views - they're great!
@@ -68,7 +66,7 @@ class Db(dbConfig: DbConfig)(closeableDataSource:CloseableDataSource, ec: Execut
 
   TL;DR for blockchain type applications views are a good solution.
    */
-  def view(name: String): View = viewCache.getOrElseUpdate(name, new View(name, runContext, dbConfig.freeBlobsEarly))
+  def view(name: String): View = new View(name, runContext, dbConfig.freeBlobsEarly)
 
   def dropView(viewName: String): FutureTx[Int] = executeSql(s"DROP VIEW ${viewName}")
 

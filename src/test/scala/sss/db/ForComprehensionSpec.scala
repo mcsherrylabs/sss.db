@@ -19,7 +19,7 @@ class ForComprehensionSpec extends DbSpecSetup {
 
     } yield ()
 
-    var rs: Stream[Row] = fixture.dbUnderTest.table("testForComp").toPaged(2).toStream
+    var rs: LazyList[Row] = fixture.dbUnderTest.table("testForComp").toPaged(2).toStream
 
     0 until 50 foreach { i =>
       println(s"$i ${rs.headOption}")

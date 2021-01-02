@@ -3,11 +3,12 @@ package sss.db
 import java.io.InputStream
 import java.sql.PreparedStatement
 import java.util.Date
-
 import org.joda.time.LocalDate
 import sss.ancillary.{Logging, LoggingFutureSupport}
 
-import scala.collection.generic.FilterMonadic
+import scala.collection.WithFilter
+
+//import scala.collection.generic.FilterMonadic
 import scala.collection.mutable
 import scala.language.implicitConversions
 import scala.reflect.runtime.universe._
@@ -99,18 +100,21 @@ class Query private[db] (private val selectSql: String,
 
   def getRow(rowId: Long): FutureTx[Option[Row]] = getRow(where(id -> rowId))
 
-  def map[B, W <% Where](f: Row => B, where: W = where()): FutureTx[QueryResults[B]] = filter(where).map(_ map f)
+  def map[B, W](f: Row => B, where: W = where())(implicit ev: W => Where): FutureTx[QueryResults[B]] = filter(where).map(_ map f)
 
-  def flatMap[B, W <% Where](f: Row => QueryResults[B], where: W = where()): FutureTx[QueryResults[B]] = {
+  def flatMap[B, W](f: Row => QueryResults[B], where: W = where())(implicit ev: W => Where): FutureTx[QueryResults[B]] = {
     map(identity, where)
       .map(
       _.foldLeft(List[B]())((acc,e) => acc ++ f(e))
       .toIndexedSeq)
   }
 
-  def withFilter(f: Row => Boolean): FutureTx[FilterMonadic[Row,QueryResults[Row]]] = map(identity).map(_.withFilter(f))
+  def withFilter(f: Row => Boolean): FutureTx[WithFilter[Row,QueryResults]] = {
+    val t: FutureTx[QueryResults[Row]] = map(identity)
+    t.map(_.withFilter(f))
+  }
 
-  def foreach[W <% Where](f: Row => Unit, where: W = where()): FutureTx[QueryResults[Unit]] = map(f, where)
+  def foreach[W](f: Row => Unit, where: W = where())(implicit ev: W => Where): FutureTx[QueryResults[Unit]] = map(f, where)
 
   /**
     * Note - You can put ORDER BY into the Where clause ...

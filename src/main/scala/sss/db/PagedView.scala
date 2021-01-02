@@ -79,15 +79,15 @@ object PagedView {
 
   implicit class ToStream(val pagedView: PagedView) extends AnyVal {
 
-    def toStream(implicit dataSource: DataSource): Stream[Row] = {
+    def toStream(implicit dataSource: DataSource): LazyList[Row] = {
 
-      def toStream(fPage: FutureTx[Option[Page]]): Stream[Rows] = {
+      def toStream(fPage: FutureTx[Option[Page]]): LazyList[Rows] = {
 
         fPage.runSync match {
-          case Failure(e) => Stream.empty[Rows]
+          case Failure(e) => LazyList.empty[Rows]
           case Success(pageOpt) => pageOpt match {
             case Some(page) => page.rows #:: toStream(page.next)
-            case None => Stream.empty[Rows]
+            case None => LazyList.empty[Rows]
           }
         }
       }
