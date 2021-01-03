@@ -2,6 +2,7 @@ package sss
 
 import sss.ancillary.FutureOps.AwaitReady
 import sss.ancillary.Logging
+import sss.db.IsNull.IsNull
 
 import java.io.{ByteArrayInputStream, InputStream}
 import java.math.BigDecimal
@@ -11,6 +12,8 @@ import javax.sql.DataSource
 import sss.db.NullOrder.NullOrder
 import sss.db.TxIsolationLevel.TxIsolationLevel
 
+import java.util
+import java.util.Locale
 import scala.collection.mutable
 import scala.concurrent.{ExecutionContext, Future}
 import scala.language.implicitConversions
@@ -399,13 +402,10 @@ package object db extends Logging {
         None
       } else if (typeOf[T] == typeOf[Array[Byte]] && rawVal.isInstanceOf[Blob]) {
         blobToBytes(rawVal.asInstanceOf[Blob])
-      } else if (typeOf[T] == typeOf[ArraySeq[Byte]] && rawVal.isInstanceOf[Blob]) {
       } else if (typeOf[T] == typeOf[mutable.ArraySeq[Byte]] && rawVal.isInstanceOf[Blob]) {
         blobToWrappedBytes(rawVal.asInstanceOf[Blob])
-      } else if (typeOf[T] == typeOf[ArraySeq[Byte]] && rawVal.isInstanceOf[Array[Byte]]) {
-        (rawVal.asInstanceOf[Array[Byte]]).to(ArraySeq)
       } else if (typeOf[T] == typeOf[mutable.ArraySeq[Byte]] && rawVal.isInstanceOf[Array[Byte]]) {
-        new mutable.ArraySeq.ofByte(rawVal.asInstanceOf[Array[Byte]])
+        (rawVal.asInstanceOf[Array[Byte]]).to(mutable.ArraySeq)
       } else if (typeOf[T] == typeOf[InputStream] && rawVal.isInstanceOf[Blob]) {
         blobToStream(rawVal.asInstanceOf[Blob])
       } else if (typeOf[T] == typeOf[Byte] && rawVal.isInstanceOf[Array[Byte]]) {
@@ -485,7 +485,7 @@ package object db extends Logging {
 
     private def blobToBytes(jDBCBlobClient: Blob): Array[Byte] = jDBCBlobClient.getBytes(1, jDBCBlobClient.length.toInt)
 
-    private def blobToWrappedBytes(jDBCBlobClient: Blob): ArraySeq[Byte] = jDBCBlobClient.getBytes(1, jDBCBlobClient.length.toInt).to(ArraySeq)
+    private def blobToWrappedBytes(jDBCBlobClient: Blob): mutable.ArraySeq[Byte] = jDBCBlobClient.getBytes(1, jDBCBlobClient.length.toInt).to(mutable.ArraySeq)
 
     override def toString: String = {
       asMap.foldLeft("") { case (a, (k, v)) => a + s" Key:$k, Value: $v" }

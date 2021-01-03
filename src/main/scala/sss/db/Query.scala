@@ -43,13 +43,17 @@ class Query private[db] (private val selectSql: String,
   def noNullsAllowed(col: String): Boolean =
     columnsMetaInfo.exists(e => e.name == col && e.noNullsAllowed)
 
-  lazy val columnsMetaInfo: ColumnsMetaInfo = tx {
+  lazy val columnsMetaInfo: ColumnsMetaInfo =  {
+    val conn = runContext.ds.getConnection
     val st = conn.createStatement()
     try {
 
       val rs = st.executeQuery(s"$selectSql")
       Rows.columnsMetaInfo(rs.getMetaData)
-    } finally st.close()
+    } finally {
+      st.close()
+      conn.close()
+    }
   }
 
   private[db] def mapToSql(value: Any): Any = {
@@ -170,19 +174,18 @@ class Query private[db] (private val selectSql: String,
     * @return
     */
 
-  def toIntId(lookup: (String, Any)*): Int = toIntIdOpt(lookup: _*).get
+  def toIntId(lookup: (String, Any)*): FutureTx[Int] = toIntIdOpt(lookup: _*).map(_.get)
 
-  def toIntIdOpt(lookup: (String, Any)*): Option[Int] = find(lookup: _*) map (_.int(id))
+  def toIntIdOpt(lookup: (String, Any)*): FutureTx[Option[Int]] = find(lookup: _*) map (_.map(_.int(id)))
 
-  def toIntIds(lookup: (String, Any)*): Seq[Int] = filter(lookup: _*) map (_.int(id))
+  def toIntIds(lookup: (String, Any)*): FutureTx[Seq[Int]] = filter(lookup: _*) map (_.map(_.int(id)))
 
-  def toLongId(lookup: (String, Any)*): Long = toLongIdOpt(lookup: _*).get
+  def toLongId(lookup: (String, Any)*): FutureTx[Long] = toLongIdOpt(lookup: _*).map(_.get)
 
-  def toLongIdOpt(lookup: (String, Any)*): Option[Long] = find(lookup: _*) map (_.long(id))
+  def toLongIdOpt(lookup: (String, Any)*): FutureTx[Option[Long]] = find(lookup: _*) map (_.map(_.long(id)))
 
-  def toLongIds(lookup: (String, Any)*): Seq[Long] = filter(lookup: _*) map (_.long(id))
+  def toLongIds(lookup: (String, Any)*): FutureTx[Seq[Long]] = filter(lookup: _*) map (_.map(_.long(id)))
 
-  def get(id: Long): Option[Row] = getRow(id)
 
   def get(id: Long): FutureTx[Option[Row]] = getRow(id)
 

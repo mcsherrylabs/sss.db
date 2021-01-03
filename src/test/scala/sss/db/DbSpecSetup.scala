@@ -1,8 +1,6 @@
 package sss.db
 
 import org.scalatest._
-import org.scalatest.flatspec.{AnyFlatSpec, AsyncFlatSpec}
-import org.scalatest.matchers.should.Matchers
 import sss.db.datasource.DataSource
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.flatspec.{AnyFlatSpec, AsyncFlatSpec}
@@ -38,4 +36,3 @@ trait DbSpecSetupBase extends Matchers with BeforeAndAfter {
 
 trait DbSpecSetup extends AnyFlatSpec with DbSpecSetupBase
 trait AsyncDbSpecSetup extends AsyncFlatSpec with DbSpecSetupBase
-

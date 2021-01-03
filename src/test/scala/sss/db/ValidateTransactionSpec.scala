@@ -2,12 +2,11 @@ package sss.db
 
 import java.lang.RuntimeException
 import java.util.Date
-
 import org.scalatest._
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
-import scala.util.Try
+import scala.util.{Failure, Try}
 
 
 
@@ -44,7 +43,7 @@ class ValidateTransactionSpec extends DbSpecSetup {
 
 
     val f = for {
-      maxId <- fixture.table.maxId
+      maxId <- fixture.table.maxId()
       row: Row <- fixture.table.insert(Map("strId" -> "strId", "createTime" -> time, "intVal" -> 67))
       newMaxIdRow: Row <- fixture.table(row.id)
       newMaxId = newMaxIdRow.id
@@ -74,16 +73,16 @@ class ValidateTransactionSpec extends DbSpecSetup {
       _ <- fixture.table.insert(Map("strId" -> "strId", "createTime" -> time, "intVal" -> 67))
       _ <- fixture.table.insert(Map("strId" -> "strId", "createTime" -> time, "intVal" -> 67))
       _ = throw new RuntimeException("FAIL THIS TX!")
-    } yield currentMax
+    } yield ()
 
 
-    val result = inserts.run recover {
-      case e => fixture.table.setNextIdToMaxIdPlusOne()
-    } flatMap { _ =>
-      fixture.table.insert(Map("strId" -> "strId", "createTime" -> time, "intVal" -> 67)).run
+    val result = inserts.run.andThen {
+      case Failure(e) =>
+        fixture.table.setNextIdToMaxIdPlusOne()
+        val r = fixture.table.insert(Map("strId" -> "strId", "createTime" -> time, "intVal" -> 67)).runSync.get
+        assert(r.id == currentMax + 1, "Failed inserts should not increment the identity sequence ")
     }
 
-    val r = Await.result(result, 1.second)
-    assert(r.id == currentMax + 1, "Failed inserts should not increment the identity sequence ")
+
   }
 }

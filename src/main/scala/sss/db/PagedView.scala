@@ -12,8 +12,8 @@ trait Page {
   val rows: Rows
   val next: FutureTx[Option[Page]]
   val prev: FutureTx[Option[Page]]
-  val hasNext: FutureTx[Boolean] = next.map(_.exists(_ => true))
-  val hasPrev: FutureTx[Boolean] = prev.map(_.exists(_ => true))
+  val hasNext: FutureTx[Boolean] = next.map(_.isDefined)
+  val hasPrev: FutureTx[Boolean] = prev.map(_.isDefined)
   /**
     * An enclosing tx may be necessary if the rows contain Blobs, and early blob freeing is not
     * true. In this case, the blobs are only guaranteed to live until the tx is closed.
@@ -29,10 +29,8 @@ private case class PageImpl private(indexCol: String,
 
   require(rows.nonEmpty, "The EmptyPage handles no row situations.")
 
-  lazy private val firstIndexInPage = rows.head[Number](indexCol).longValue
-  lazy private val lastIndexInPage = rows.last[Number](indexCol).longValue
-  private val firstIndexInPage = rows.head.number(indexCol).longValue
-  private val lastIndexInPage = rows.last.number(indexCol).longValue
+  private lazy val firstIndexInPage = rows.head.number(indexCol).longValue
+  private lazy val lastIndexInPage = rows.last.number(indexCol).longValue
 
   lazy override val next: FutureTx[Option[Page]] = {
     nextRows.map(rs =>

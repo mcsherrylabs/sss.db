@@ -62,7 +62,10 @@ class RowSerializeSpec extends DbSpecSetup {
     val blobIn = createFile(1 * KB)
     blobIn.deleteOnExit()
 
-    val row = view.insert(Map(
+    val db = fixture.dbUnderTest
+    import db.runContext.ds
+
+    val plan = view.insert(Map(
       int_col -> 34,
       int_col_opt -> None,
       char_col -> 'C',
@@ -89,6 +92,7 @@ class RowSerializeSpec extends DbSpecSetup {
       blob_col_opt -> None,
     ))
 
+    val row = plan.runSync.get
     val serialized = row.toBytes(view.columnsMetaInfo)
 
     val row2 = rowFromBytes(view.columnsMetaInfo, serialized)
@@ -102,6 +106,9 @@ class RowSerializeSpec extends DbSpecSetup {
     val blobIn = createFile(1 * KB)
     blobIn.deleteOnExit()
 
+    val db = fixture.dbUnderTest
+    import db.runContext.ds
+
     val row = view.insert(Map(
       int_col -> 34,
       char_col -> 'C',
@@ -114,7 +121,7 @@ class RowSerializeSpec extends DbSpecSetup {
       longvarbinary_col -> randomByteArySeq(30),
       blob_col -> new FileInputStream(blobIn),
 
-    ))
+    )).runSync.get
 
     val serialized = row.toBytes(view.columnsMetaInfo)
 
@@ -128,6 +135,8 @@ class RowSerializeSpec extends DbSpecSetup {
 
     val blobIn = createFile(1 * KB)
     blobIn.deleteOnExit()
+    val db = fixture.dbUnderTest
+    import db.runContext.ds
 
     val row = view.insert(Map(
       int_col -> 34,
@@ -151,7 +160,7 @@ class RowSerializeSpec extends DbSpecSetup {
       longvarbinary_col_opt -> randomByteAry(30),
       blob_col -> new FileInputStream(blobIn),
       blob_col_opt -> new FileInputStream(blobIn),
-    ))
+    )).runSync.get
 
     val serialized = row.toBytes(view.columnsMetaInfo)
 
