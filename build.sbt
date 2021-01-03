@@ -1,9 +1,7 @@
 
 name := "sss-db"
 
-version := "0.9.43-SNAPSHOT"
-
-val scala213 = "2.13.2"
+version := "0.9.44"
 
 scalaVersion := "2.13.4"
 
@@ -15,6 +13,25 @@ parallelExecution in Test := false
 resolvers += "stepsoft" at "https://nexus.mcsherrylabs.com/repository/releases/"
 
 resolvers += "stepsoft-snapshots" at "https://nexus.mcsherrylabs.com/repository/snapshots/"
+
+
+publishTo := {
+  val nexus = "https://nexus.mcsherrylabs.com/"
+  if (isSnapshot.value)
+    Some("snapshots" at nexus + "repository/snapshots")
+  else
+    Some("releases"  at nexus + "repository/releases")
+}
+
+credentials += sys.env.get("NEXUS_USER").map(userName => Credentials(
+  "Sonatype Nexus Repository Manager",
+  "nexus.mcsherrylabs.com",
+  userName,
+  sys.env.getOrElse("NEXUS_PASS", ""))
+).getOrElse(
+  Credentials(Path.userHome / ".ivy2" / ".credentials")
+)
+
 
 dependencyOverrides += "org.scala-lang" % "scala-compiler" % scalaVersion.value
 
