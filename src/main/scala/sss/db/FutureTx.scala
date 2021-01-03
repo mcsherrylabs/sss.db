@@ -19,9 +19,10 @@ trait FutureTx[+T] extends (TransactionContext => Future[T]) {
     apply(context) map t
   }
 
+  @deprecated("You are about to filter a future?")
   def withFilter(f: T => Boolean): FutureTx[T] = context => {
     import context.ec
-    apply(context) withFilter f
+    apply(context) filter f
   }
 
 

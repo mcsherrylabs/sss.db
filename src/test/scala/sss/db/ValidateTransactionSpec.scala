@@ -68,6 +68,8 @@ class ValidateTransactionSpec extends DbSpecSetup {
 
     val currentMax = fixture.table.maxId().runSyncUnSafe
 
+
+
     val inserts = for {
       _ <- fixture.table.insert(Map("strId" -> "strId", "createTime" -> time, "intVal" -> 67))
       _ <- fixture.table.insert(Map("strId" -> "strId", "createTime" -> time, "intVal" -> 67))
@@ -76,13 +78,13 @@ class ValidateTransactionSpec extends DbSpecSetup {
     } yield ()
 
 
-    val result = inserts.run.andThen {
-      case Failure(e) =>
-        fixture.table.setNextIdToMaxIdPlusOne()
-        val r = fixture.table.insert(Map("strId" -> "strId", "createTime" -> time, "intVal" -> 67)).runSync.get
-        assert(r.id == currentMax + 1, "Failed inserts should not increment the identity sequence ")
+    val result = inserts.run recoverWith {
+      case e => fixture.table.setNextIdToMaxIdPlusOne().run
+    } flatMap { _ =>
+      fixture.table.insert(Map("strId" -> "strId", "createTime" -> time, "intVal" -> 67)).run
     }
 
-
+    val r = Await.result(result, 1.second)
+    assert(r.id == currentMax + 1, "Failed inserts should not increment the identity sequence ")
   }
 }

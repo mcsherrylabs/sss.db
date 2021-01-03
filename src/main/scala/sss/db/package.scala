@@ -103,18 +103,18 @@ package object db extends Logging {
 
         case Success(result) =>
           import runContext.ec
-          println(s"commit a!! $result")
           result map { r =>
             try {
               c.commit()
-              println(s"commit!! $r")
               r
             } finally c.close()
           } recoverWith { case e =>
+
             try {
               c.rollback()
-              Future.failed[T](e)
             } finally c.close()
+
+            Future.failed[T](e)
           }
 
       }
@@ -173,34 +173,6 @@ package object db extends Logging {
     def runSyncUnSafe(implicit d: DataSource): T = runSync.get
 
   }
-
-  /*case class FutTxSeq[A](value: FutureTx[Seq[A]]) {
-
-    def map[B](f: A => B): FutTxSeq[B] =
-      FutTxSeq(value.map(optA => optA.map(f)))
-
-    def flatMap[B](f: A => FutTxSeq[B]): FutTxSeq[B] =
-      FutTxSeq(
-        value.flatMap { seqA: Seq[A] =>
-          val s1: Seq[FutureTx[Seq[B]]] = seqA.map(f(_).value)
-          val s2: FutureTx[Seq[Seq[B]]] = FutureTx.sequence(s1)
-          s2 map (_.flatten)
-        }
-      )
-
-  }
-
-  case class FutTxOpt[A](value: FutureTx[Option[A]]) {
-
-    def map[B](f: A => B): FutTxOpt[B] =
-      FutTxOpt(value.map(optA => optA.map(f)))
-
-    def flatMap[B](f: A => FutTxOpt[B]): FutTxOpt[B] =
-      FutTxOpt(value.flatMap({
-        case Some(a) => f(a).value
-        case None => FutureTx.unit(None)
-      }))
-  }*/
 
   implicit class SqlHelper(val sc: StringContext) extends AnyVal {
     def ps(args: Any*): (String, Seq[Any]) = {

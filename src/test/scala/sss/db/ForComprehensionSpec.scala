@@ -2,7 +2,7 @@ package sss.db
 
 import org.scalatest.DoNotDiscover
 
-import scala.util.Try
+import scala.util.{Success, Try}
 
 @DoNotDiscover
 class ForComprehensionSpec extends DbSpecSetup {
@@ -29,11 +29,11 @@ class ForComprehensionSpec extends DbSpecSetup {
     } yield(r)
 
     0 until 50 foreach { i =>
-      println(s"$i ${rs.headOption}")
+      //println(s"$i ${rs.headOption}")
       rs = rs.tail
     }
 
-    //assert(rows.size === 10, "Should be 10 rows!")
+    assert(rows.size === 10, "Should be 10 rows!")
 
   }
 
@@ -145,4 +145,43 @@ class ForComprehensionSpec extends DbSpecSetup {
 
   }
 
+  it should " support FutureTx nested generator (thru flatMap) " in {
+
+    val db = fixture.dbUnderTest
+    import db.runContext.ds
+
+
+    val tableNames = createAndFillTenTables
+
+    val seqFutTxs2 :Seq[FutureTx[QueryResults[Row]]] = (for {
+      name <- tableNames
+      table = fixture.dbUnderTest.table(name)
+    } yield Seq(table.map(identity), table.map(identity))).flatten
+
+    val futSeqRows: FutureTx[Seq[QueryResults[Row]]] = FutureTx.sequence(seqFutTxs2)
+
+    val futRows: FutureTx[Seq[Row]] = futSeqRows.map(_.flatten)
+
+    val futRowsFilter = futRows.map(rows => rows.filter(_.int("id") <= 5))
+
+    futRowsFilter.map {
+      all =>
+        assert(all.size === 100)
+    }.runSyncUnSafe
+
+
+
+    //run another test, checks no interference in first test.
+    val seqFutTxs :Seq[FutureTx[QueryResults[Row]]] = for {
+      name <- tableNames
+      table = fixture.dbUnderTest.table(name)
+    } yield table.map(identity)
+
+    val futTxSeq = FutureTx.sequence(seqFutTxs)
+
+    futTxSeq.map { r1 =>
+        assert(r1.flatten.size === 100)
+    }.runSyncUnSafe
+
+  }
 }

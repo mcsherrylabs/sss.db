@@ -13,8 +13,8 @@ class Table private[db] (name: String,
     freeBlobsEarly,
     columns) {
 
-  def setNextIdToMaxIdPlusOne(): FutureTx[Unit] = {
-    maxId().map(max => setNextId(max + 1))
+  def setNextIdToMaxIdPlusOne(): FutureTx[Boolean] = {
+    maxId().flatMap(max => setNextId(max + 1))
   }
 
   def setNextId(next: Long): FutureTx[Boolean] = { context =>
