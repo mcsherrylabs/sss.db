@@ -33,6 +33,7 @@ class SetIsolationLevelSupportSpec extends DbSpecSetup {
     val db = fixture.dbUnderTest
     implicit val cntxt = db.runContext(TxIsolationLevel.SERIALIZABLE)
     import cntxt.ds
+    import cntxt.executor
 
 
     val testCount = 100
@@ -55,7 +56,7 @@ class SetIsolationLevelSupportSpec extends DbSpecSetup {
 
     }
 
-    assert(fixture.table.count.runSyncUnSafe === testCount, s"Should only be $testCount rows inserted")
+    assert(fixture.table.count.runSyncAndGet === testCount, s"Should only be $testCount rows inserted")
   }
 
 

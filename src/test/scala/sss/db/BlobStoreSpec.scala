@@ -53,6 +53,7 @@ class BlobStoreSpec extends DbSpecSetup {
 
     val db = fixture.dbUnderTest
     import db.runContext.ds
+    import db.runContext.executor
     val start = System.currentTimeMillis()
 
     val numB = KB * 10
@@ -64,12 +65,12 @@ class BlobStoreSpec extends DbSpecSetup {
     println(s"Setup/Create ${numB} KB file took ${startWrite-start} ms")
 
     val in = new FileInputStream(fIn)
-    val index = table.insert(Map("blobVal" -> in)).runSyncUnSafe
+    val index = table.insert(Map("blobVal" -> in)).runSyncAndGet
 
     val writeDone = System.currentTimeMillis()
     println(s"Write ${numB} KB file to db took ${writeDone - startWrite} ms")
 
-    val found = table.get(index.id).runSyncUnSafe
+    val found = table.get(index.id).runSyncAndGet
     assert(found.isDefined)
     val is = found.get[InputStream]("blobVal")
 
@@ -109,6 +110,7 @@ class BlobStoreSpec extends DbSpecSetup {
 
     val db = fixture.dbUnderTest
     import db.runContext.ds
+    import db.runContext.executor
     val table = db.table("testBinary")
 
     val testByte: Byte = 34
@@ -121,7 +123,7 @@ class BlobStoreSpec extends DbSpecSetup {
       _ = assert(Option(empty[Byte]("byteVal")).isEmpty)
       _ = assert(empty[Option[Byte]]("byteVal") === None)
 
-    } yield ()).runSyncUnSafe
+    } yield ()).runSyncAndGet
 
   }
 
@@ -131,6 +133,7 @@ class BlobStoreSpec extends DbSpecSetup {
 
     val db = fixture.dbUnderTest
     import db.runContext.ds
+    import db.runContext.executor
     val table = db.table("testBinary")
 
     val plan = for {
@@ -139,13 +142,14 @@ class BlobStoreSpec extends DbSpecSetup {
       _ = assert(new String(m[Array[Byte]]("blobVal")) === testStr)
     } yield()
 
-    plan.runSyncUnSafe
+    plan.runSyncAndGet
   }
 
   it should "support persisting wrapped binary arrays as a blob" in {
 
     val db = fixture.dbUnderTest
     import db.runContext.ds
+    import db.runContext.executor
     val table = db.table("testBinary")
 
     val testStr = "Hello My Friend"
@@ -158,7 +162,7 @@ class BlobStoreSpec extends DbSpecSetup {
       _ = assert(new String(m[Array[Byte]]("blobVal").array) === testStr)
     } yield ()
 
-    plan.runSyncUnSafe
+    plan.runSyncAndGet
 
   }
 
@@ -166,6 +170,7 @@ class BlobStoreSpec extends DbSpecSetup {
 
     val db = fixture.dbUnderTest
     import db.runContext.ds
+    import db.runContext.executor
     val table = db.table("testBinary")
     val testStr = "Hello My Friend"
     val bytes = testStr.getBytes
@@ -178,7 +183,7 @@ class BlobStoreSpec extends DbSpecSetup {
       _ = assert(new String(found.get[mutable.ArraySeq[Byte]]("blobVal").toArray, StandardCharsets.UTF_8) === testStr)
     } yield ()
 
-    plan.runSyncUnSafe
+    plan.runSyncAndGet
 
   }
 
@@ -186,6 +191,7 @@ class BlobStoreSpec extends DbSpecSetup {
 
     val db = fixture.dbUnderTest
     import db.runContext.ds
+    import db.runContext.executor
     val table = db.table("testBinary")
 
     val testStr = "Hello My Friend"
@@ -200,7 +206,7 @@ class BlobStoreSpec extends DbSpecSetup {
       _ = assert(new String(found.get[Array[Byte]]("blobVal").array) === testStr)
     } yield ()
 
-    plan.runSyncUnSafe
+    plan.runSyncAndGet
 
   }
 
@@ -208,6 +214,7 @@ class BlobStoreSpec extends DbSpecSetup {
 
     val db = fixture.dbUnderTest
     import db.runContext.ds
+    import db.runContext.executor
     val table = db.table("testBinary")
     val testStr = "Hello My Friend"
     val bytes = testStr.getBytes
@@ -225,7 +232,7 @@ class BlobStoreSpec extends DbSpecSetup {
       _ = assert(new String(readBytes) === testStr)
     } yield ()
 
-    plan.runSyncUnSafe
+    plan.runSyncAndGet
   }
 
 

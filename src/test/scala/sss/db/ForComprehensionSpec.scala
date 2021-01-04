@@ -12,10 +12,11 @@ class ForComprehensionSpec extends DbSpecSetup {
 
     val db = fixture.dbUnderTest
     import db.runContext.ds
+    import db.runContext.executor
 
     for {
       x <- 0 until 100
-      _ = db.table("testForComp").insert(x, x+1, "strId" + x).runSyncUnSafe
+      _ = db.table("testForComp").insert(x, x+1, "strId" + x).runSyncAndGet
 
     } yield ()
 
@@ -41,6 +42,7 @@ class ForComprehensionSpec extends DbSpecSetup {
 
     val db = fixture.dbUnderTest
     import db.runContext.ds
+    import db.runContext.executor
 
     //create 10 tables
     val tableNames = for {
@@ -50,7 +52,7 @@ class ForComprehensionSpec extends DbSpecSetup {
         s"$statusCol VARCHAR(50), " +
         s"PRIMARY KEY(id)) "
 
-      _ = fixture.dbUnderTest.executeSql(blockSql).runSyncUnSafe
+      _ = fixture.dbUnderTest.executeSql(blockSql).runSyncAndGet
     } yield s"block_$index"
 
     //put 10 lines in each table = 100 rows
@@ -58,7 +60,7 @@ class ForComprehensionSpec extends DbSpecSetup {
       name <- tableNames
       table = fixture.dbUnderTest.table(name)
       x <- (0 until 10)
-      _ = table.insert(Map(statusCol -> s"Something $name")).runSyncUnSafe
+      _ = table.insert(Map(statusCol -> s"Something $name")).runSyncAndGet
     } yield()
 
     tableNames
@@ -68,6 +70,7 @@ class ForComprehensionSpec extends DbSpecSetup {
 
     val db = fixture.dbUnderTest
     import db.runContext.ds
+    import db.runContext.executor
 
     val tableNames = createAndFillTenTables
     // go through each table in a paged manner and find all the rows
@@ -93,6 +96,7 @@ class ForComprehensionSpec extends DbSpecSetup {
 
     val db = fixture.dbUnderTest
     import db.runContext.ds
+    import db.runContext.executor
     val x = 1000
     val t = fixture.dbUnderTest.table("testForComp")
 
@@ -112,7 +116,7 @@ class ForComprehensionSpec extends DbSpecSetup {
       } yield v2).runSync
 
     assert(result.isFailure, "Should have thrown exception in badTx")
-    assert(t.find(where(idCol -> x)).runSyncUnSafe.isEmpty, "tx rollback should have prevented row write")
+    assert(t.find(where(idCol -> x)).runSyncAndGet.isEmpty, "tx rollback should have prevented row write")
 
   }
 
@@ -121,22 +125,23 @@ class ForComprehensionSpec extends DbSpecSetup {
 
     val db = fixture.dbUnderTest
     import db.runContext.ds
+    import db.runContext.executor
 
     val tableNames = createAndFillTenTables
 
     val r1: Seq[Row] = for {
       name <- tableNames
       table = fixture.dbUnderTest.table(name)
-      row <- table.map(identity).runSyncUnSafe
+      row <- table.map(identity).runSyncAndGet
     } yield row
 
     assert(r1.size === 100)
 
     val allRowsFiltered = for {
       name <- tableNames
-      table = fixture.dbUnderTest.table(name).map(identity).runSyncUnSafe
+      table = fixture.dbUnderTest.table(name).map(identity).runSyncAndGet
       row <- table
-      row2 <- fixture.dbUnderTest.table(name).map(identity).runSyncUnSafe
+      row2 <- fixture.dbUnderTest.table(name).map(identity).runSyncAndGet
       if row[Int](idCol) == row2[Int](idCol)
     } yield row2
 
@@ -149,6 +154,7 @@ class ForComprehensionSpec extends DbSpecSetup {
 
     val db = fixture.dbUnderTest
     import db.runContext.ds
+    import db.runContext.executor
 
 
     val tableNames = createAndFillTenTables
@@ -167,7 +173,7 @@ class ForComprehensionSpec extends DbSpecSetup {
     futRowsFilter.map {
       all =>
         assert(all.size === 100)
-    }.runSyncUnSafe
+    }.runSyncAndGet
 
 
 
@@ -181,7 +187,7 @@ class ForComprehensionSpec extends DbSpecSetup {
 
     futTxSeq.map { r1 =>
         assert(r1.flatten.size === 100)
-    }.runSyncUnSafe
+    }.runSyncAndGet
 
   }
 }

@@ -79,7 +79,7 @@ object PagedView {
 
   implicit class ToStream(val pagedView: PagedView) extends AnyVal {
 
-    def toStream(implicit dataSource: DataSource): LazyList[Row] = {
+    def toStream(implicit dataSource: DataSource, executor: FutureTxExecutor = FutureTxExecutor): LazyList[Row] = {
 
       def toStream(fPage: FutureTx[Option[Page]]): LazyList[Rows] = {
 

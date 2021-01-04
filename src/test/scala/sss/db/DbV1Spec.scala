@@ -14,6 +14,7 @@ class DbV1Spec extends DbSpecSetup {
 
     val db = fixture.dbUnderTest
     import db.runContext.ds
+    import db.runContext.executor
 
     val numInserted = fixture.table.insert(0, "strId", new Date().getTime, 42).runSync.get
     assert(numInserted == 1, s"Should be 1 row created not ${numInserted}!")
@@ -23,6 +24,7 @@ class DbV1Spec extends DbSpecSetup {
 
     val db = fixture.dbUnderTest
     import db.runContext.ds
+    import db.runContext.executor
 
     val time = new Date()
     val rowsT = for {
@@ -44,6 +46,7 @@ class DbV1Spec extends DbSpecSetup {
 
     val db = fixture.dbUnderTest
     import db.runContext.ds
+    import db.runContext.executor
 
     val time = new Date()
 
@@ -69,6 +72,7 @@ class DbV1Spec extends DbSpecSetup {
 
     val db = fixture.dbUnderTest
     import db.runContext.ds
+    import db.runContext.executor
 
     val time = new Date()
     fixture.table.insert(0, "strId", time, 45).runSync
@@ -84,6 +88,7 @@ class DbV1Spec extends DbSpecSetup {
 
     val db = fixture.dbUnderTest
     import db.runContext.ds
+    import db.runContext.executor
 
     val time = new Date()
     fixture.table.insert(3456, "strId", time, 45).runSync
@@ -98,6 +103,7 @@ class DbV1Spec extends DbSpecSetup {
   it should " be able to find the row inserted by id " in {
     val db = fixture.dbUnderTest
     import db.runContext.ds
+    import db.runContext.executor
 
     val time = new Date()
     (fixture.table.insert(99, "strId", time, 45) flatMap { i =>
@@ -112,6 +118,7 @@ class DbV1Spec extends DbSpecSetup {
 
     val db = fixture.dbUnderTest
     import db.runContext.ds
+    import db.runContext.executor
 
     val time = new Date()
 
@@ -130,6 +137,7 @@ class DbV1Spec extends DbSpecSetup {
 
     val db = fixture.dbUnderTest
     import db.runContext.ds
+    import db.runContext.executor
 
     val time = new Date()
     val p = for {
@@ -147,6 +155,7 @@ class DbV1Spec extends DbSpecSetup {
 
     val db = fixture.dbUnderTest
     import db.runContext.ds
+    import db.runContext.executor
 
     val time = new Date()
 
@@ -167,6 +176,7 @@ class DbV1Spec extends DbSpecSetup {
     val time = new Date()
     val db = fixture.dbUnderTest
     import db.runContext.ds
+    import db.runContext.executor
 
     val p = for {
       _ <- fixture.table.insert(999999, "strId", time, 45)
@@ -183,6 +193,7 @@ class DbV1Spec extends DbSpecSetup {
     val time = new Date()
     val db = fixture.dbUnderTest
     import db.runContext.ds
+    import db.runContext.executor
 
     val plan = for {
       _ <- fixture.table.insert(999999, "strId", time, 45)
@@ -201,6 +212,7 @@ class DbV1Spec extends DbSpecSetup {
     val time = new Date()
     val db = fixture.dbUnderTest
     import db.runContext.ds
+    import db.runContext.executor
 
     val plan = for {
       _ <- fixture.table.insert(999999, "strId", time, 45)
@@ -218,6 +230,7 @@ class DbV1Spec extends DbSpecSetup {
     val time = new Date()
     val db = fixture.dbUnderTest
     import db.runContext.ds
+    import db.runContext.executor
 
     val plan = for {
       _ <- fixture.table.insert(999999, "strId", time, 45)
@@ -234,6 +247,7 @@ class DbV1Spec extends DbSpecSetup {
     val time = new Date()
     val db = fixture.dbUnderTest
     import db.runContext.ds
+    import db.runContext.executor
 
     val plan = for {
       _ <- fixture.table.insert(999999, "strId", time, 45)
@@ -255,6 +269,7 @@ class DbV1Spec extends DbSpecSetup {
 
     val db = fixture.dbUnderTest
     import db.runContext.ds
+    import db.runContext.executor
 
     val table = fixture.dbUnderTest.table("testBinary")
 
@@ -276,6 +291,7 @@ class DbV1Spec extends DbSpecSetup {
 
     val db = fixture.dbUnderTest
     import db.runContext.ds
+    import db.runContext.executor
 
 
     val table = fixture.dbUnderTest.table("testBinary")
@@ -299,6 +315,7 @@ class DbV1Spec extends DbSpecSetup {
     val db = fixture.dbUnderTest
     import db.runContext.ds
     import IsNull._
+    import db.runContext.executor
 
     val table = fixture.dbUnderTest.table("testBinary")
 

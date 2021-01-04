@@ -63,7 +63,7 @@ class RowSerializeSpec extends DbSpecSetup {
     blobIn.deleteOnExit()
 
     val db = fixture.dbUnderTest
-    import db.runContext.ds
+    import db.runContext._
 
     val plan = view.insert(Map(
       int_col -> 34,
@@ -107,7 +107,7 @@ class RowSerializeSpec extends DbSpecSetup {
     blobIn.deleteOnExit()
 
     val db = fixture.dbUnderTest
-    import db.runContext.ds
+    import db.runContext._
 
     val row = view.insert(Map(
       int_col -> 34,
@@ -136,7 +136,7 @@ class RowSerializeSpec extends DbSpecSetup {
     val blobIn = createFile(1 * KB)
     blobIn.deleteOnExit()
     val db = fixture.dbUnderTest
-    import db.runContext.ds
+    import db.runContext._
 
     val row = view.insert(Map(
       int_col -> 34,

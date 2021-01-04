@@ -8,6 +8,7 @@ import sss.db.datasource.DataSource
 import sss.db.datasource.DataSource._
 
 import scala.concurrent.ExecutionContext
+import scala.util.Try
 
 
 
@@ -75,7 +76,7 @@ class Db(dbConfig: DbConfig)(closeableDataSource:CloseableDataSource, ec: Execut
 
 
   def shutdown: FutureTx[Int] = {
-    executeSql("SHUTDOWN") //andAfter{case _  => closeableDataSource.close()}
+    executeSql("SHUTDOWN") //.map{case x  => Try(closeableDataSource.close()); x}
   }
 
   /**

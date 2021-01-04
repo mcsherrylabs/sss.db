@@ -18,8 +18,8 @@ class ValidateTransactionSpec extends DbSpecSetup {
 
     val db = fixture.dbUnderTest
     import db.runContext
-    import db.runContext.ds
-    import db.runContext.ec
+    import db.runContext._
+
 
     val time = new Date()
 
@@ -27,7 +27,7 @@ class ValidateTransactionSpec extends DbSpecSetup {
 
     val assertedRow = eventualRow map { r =>
       // is id of new record, which should not exist
-      assert (fixture.table.get(r.id).runSyncUnSafe.isEmpty, "Should have rolled back")
+      assert (fixture.table.get(r.id).runSyncAndGet.isEmpty, "Should have rolled back")
     }
 
     Await.result(assertedRow, 1.second)
@@ -39,7 +39,7 @@ class ValidateTransactionSpec extends DbSpecSetup {
     val db = fixture.dbUnderTest
     import db.runContext
 
-    import db.runContext.ds
+    import db.runContext._
 
 
     val f = for {
@@ -53,7 +53,7 @@ class ValidateTransactionSpec extends DbSpecSetup {
 
     Try(Await.result(f.run, 1.second))
 
-    val r = fixture.table.get(1).runSyncUnSafe
+    val r = fixture.table.get(1).runSyncAndGet
     assert (r.isEmpty, "Should have rolled back")
 
   }
@@ -63,10 +63,9 @@ class ValidateTransactionSpec extends DbSpecSetup {
 
     val db = fixture.dbUnderTest
     import db.runContext
-    import db.runContext.ds
-    import db.runContext.ec
+    import db.runContext._
 
-    val currentMax = fixture.table.maxId().runSyncUnSafe
+    val currentMax = fixture.table.maxId().runSyncAndGet
 
 
 

@@ -25,7 +25,7 @@ class ParallelThreadSupportSpec extends DbSpecSetup {
 
     val db = fixture.dbUnderTest
     import db.runContext
-    import db.runContext.ds
+    import db.runContext._
 
 
     val effects = for {
@@ -38,7 +38,7 @@ class ParallelThreadSupportSpec extends DbSpecSetup {
 
     assert(Await.result(FutureTx.sequence(effects).run, 10.seconds).forall(_ == true), "Run using sequence")
 
-    assert(fixture.table.count.runSyncUnSafe === 200, "Should only be 200 rows inserted")
+    assert(fixture.table.count.runSyncAndGet === 200, "Should only be 200 rows inserted")
   }
 
 

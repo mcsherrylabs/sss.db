@@ -29,7 +29,8 @@ trait DbSpecSetupBase extends Matchers with BeforeAndAfter {
   after {
     val db = fixture.dbUnderTest
     import db.runContext.ds
-    fixture.dbUnderTest.shutdown.runSyncUnSafe
+    import db.runContext.executor
+    fixture.dbUnderTest.shutdown.runSyncAndGet
   }
 
 }

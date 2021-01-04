@@ -79,99 +79,40 @@ package object db extends Logging {
 
   class RunContext(aDs: DataSource,
                    anEc: ExecutionContext,
-                   val isolationLevel: Option[TxIsolationLevel] = None
+                   val isolationLevel: Option[TxIsolationLevel] = None,
+                   anExecutor: FutureTxExecutor = FutureTxExecutor
                   ) {
     implicit val ds: DataSource = aDs
     implicit val ec: ExecutionContext = anEc
+    implicit val executor: FutureTxExecutor = anExecutor
   }
 
   implicit class RunOp[T](val t: FutureTx[T]) extends AnyVal {
     def run(implicit runContext: RunContext): Future[T] = {
-
-      val c = runContext.ds.getConnection
-      runContext.isolationLevel.foreach(l => c.setTransactionIsolation(l.id))
-
-      Try {
-        t(TransactionContext(c, runContext.ec))
-      } match {
-        case Failure(e) =>
-
-          try c.rollback()
-          finally c.close()
-
-          Future.failed(e)
-
-        case Success(result) =>
-          import runContext.ec
-          result map { r =>
-            try {
-              c.commit()
-              r
-            } finally c.close()
-          } recoverWith { case e =>
-
-            try {
-              c.rollback()
-            } finally c.close()
-
-            Future.failed[T](e)
-          }
-
-      }
+      runContext.executor.execute(t, runContext, false)
     }
 
     def runRollback(implicit runContext: RunContext): Future[T] = {
-      val c = runContext.ds.getConnection
-      runContext.isolationLevel.foreach(l => c.setTransactionIsolation(l.id))
-
-      Try {
-        t(TransactionContext(c, runContext.ec))
-      } match {
-        case Failure(e) =>
-
-          try c.rollback()
-          finally c.close()
-
-          Future.failed(e)
-
-        case Success(result) =>
-          import runContext.ec
-          result andThen { case _ =>
-            try {
-              c.rollback()
-            } finally c.close()
-          }
-      }
+      runContext.executor.execute(t, runContext, true)
     }
   }
 
   implicit class RunSyncOp[T](val t: FutureTx[T]) extends AnyVal {
 
-    def runSync(implicit d: DataSource): Try[T] = {
-      runSync(d.getConnection)
+    def runSync(implicit d: DataSource,
+                executor: FutureTxExecutor,
+                isolationLevel: Option[TxIsolationLevel] = None): Try[T] = {
+      executor.executeSync(t, d, false, isolationLevel)
     }
 
-    def runSync(c: Connection): Try[T] = {
-
-      import scala.concurrent.duration._
-      t(TransactionContext(c, ExecutionContextHelper.synchronousExecutionContext)).toTry(1.second) match {
-        case o@Failure(_) =>
-          //TODO Why bury these failures?
-          Try(c.rollback()) recover { case e => log.warn(e.toString) }
-          Try(c.close()) recover { case e => log.warn(e.toString) }
-          o
-
-        case o@Success(result) =>
-          //TODO Why bury these failures?
-          Try(c.commit()) recover { case e => log.warn(e.toString) }
-          Try(c.close()) recover { case e => log.warn(e.toString) }
-          o
-
-      }
+    def runSyncRollback(implicit d: DataSource,
+                        executor: FutureTxExecutor,
+                        isolationLevel: Option[TxIsolationLevel] = None): Try[T] = {
+      executor.executeSync(t, d, true, isolationLevel)
     }
 
-    def runSyncUnSafe(implicit d: DataSource): T = runSync.get
-
+    def runSyncAndGet(implicit d: DataSource, executor: FutureTxExecutor): T = runSync.get
+    def runSyncRollbackAndGet(implicit d: DataSource, executor: FutureTxExecutor): T = runSyncRollback.get
   }
 
   implicit class SqlHelper(val sc: StringContext) extends AnyVal {
