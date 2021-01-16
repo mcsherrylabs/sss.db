@@ -12,8 +12,8 @@ class DbV2Spec extends DbSpecSetup {
   "A Db " should " allow persist(update) using a map " in {
     val time = new Date()
     val db = fixture.dbUnderTest
-    import db.runContext.ds
-    import db.runContext.executor
+
+    import db.syncRunContext
     val table = db.table("test")
 
 
@@ -25,8 +25,8 @@ class DbV2Spec extends DbSpecSetup {
   it should " allow a specific value even in an identity field " in {
 
     val db = fixture.dbUnderTest
-    import db.runContext.ds
-    import db.runContext.executor
+
+    import db.syncRunContext
 
     val time = new Date()
     val r1 = fixture.table.insert(Map(("id" -> 1000), ("strId" -> "strId"), ("createTime" -> time), ("intVal" -> 67))).runSyncAndGet
@@ -38,8 +38,8 @@ class DbV2Spec extends DbSpecSetup {
   it should " deal with '0' id in map " in {
 
     val db = fixture.dbUnderTest
-    import db.runContext.ds
-    import db.runContext.executor
+
+    import db.syncRunContext
     val time = new Date()
     val r1 = fixture.table.persist(Map(("id" -> 0), ("strId" -> "strId"), ("createTime" -> time), ("intVal" -> 67))).runSyncAndGet
     assert(r1("id") !== 0)
@@ -53,8 +53,7 @@ class DbV2Spec extends DbSpecSetup {
   it should " allow persist(insert) using a map with no id " in {
 
     val db = fixture.dbUnderTest
-    import db.runContext.ds
-    import db.runContext.executor
+    import db.syncRunContext
 
     val time = new Date()
     val r1 = fixture.table.persist(Map(("strId" -> "strId"), ("createTime" -> time), ("intVal" -> 45))).runSyncAndGet
@@ -66,8 +65,8 @@ class DbV2Spec extends DbSpecSetup {
   it should " allow persist(update) using a map with id " in {
 
     val db = fixture.dbUnderTest
-    import db.runContext.ds
-    import db.runContext.executor
+    import db.syncRunContext
+
 
     val time = new Date()
     val r1 = fixture.table.persist(Map("strId" -> "strId", "createTime" -> time, "intVal" -> 45)).runSyncAndGet
@@ -81,8 +80,8 @@ class DbV2Spec extends DbSpecSetup {
 
   it should " allow dynamic table access " in {
     val db = fixture.dbUnderTest
-    import db.runContext.ds
-    import db.runContext.executor
+    import db.syncRunContext
+
     val time = new Date()
     val r1 = fixture.table.persist(Map(("strId" -> "strId"), ("createTime" -> time), ("intVal" -> 45))).runSyncAndGet
 
@@ -92,8 +91,8 @@ class DbV2Spec extends DbSpecSetup {
 
   it should "count table rows " in {
     val db = fixture.dbUnderTest
-    import db.runContext.ds
-    import db.runContext.executor
+    import db.syncRunContext
+
     val time = new Date()
 
     FutureTx.sequence((0 to 10) map { i =>
@@ -106,8 +105,8 @@ class DbV2Spec extends DbSpecSetup {
 
   it should "respect null first and last" in {
     val db = fixture.dbUnderTest
-    import db.runContext.ds
-    import db.runContext.executor
+    import db.syncRunContext
+
     val time = new Date()
     (for {
       _ <- fixture.table.persist(Map("strId" -> None, "createTime" -> time, "intVal" -> 101))
@@ -137,8 +136,8 @@ class DbV2Spec extends DbSpecSetup {
   it should " be able to delete a row" in {
 
     val db = fixture.dbUnderTest
-    import db.runContext.ds
-    import db.runContext.executor
+    import db.syncRunContext
+
     val time = new Date()
     val r1 = fixture.table.persist(Map("strId" -> "strId", "createTime" -> time, "intVal" -> 45)).runSyncAndGet
     val r2 = fixture.table.find(where("id = ?", r1("id"))).runSyncAndGet
@@ -151,8 +150,8 @@ class DbV2Spec extends DbSpecSetup {
   it should " be able to delete a row but respect limit " in {
 
     val db = fixture.dbUnderTest
-    import db.runContext.ds
-    import db.runContext.executor
+
+    import db.syncRunContext
 
     val time = new Date()
     val r1 = fixture.table.persist(Map("strId" -> "strId", "createTime" -> time, "intVal" -> 45)).runSyncAndGet
@@ -174,8 +173,8 @@ class DbV2Spec extends DbSpecSetup {
   it should " support paging in large tables " in {
 
     val db = fixture.dbUnderTest
-    import db.runContext.ds
-    import db.runContext.executor
+    import db.syncRunContext
+
 
     val time = new Date()
     FutureTx.sequence((0 to 100) map { i =>
@@ -196,8 +195,8 @@ class DbV2Spec extends DbSpecSetup {
 
   it should " support ordered paging in large tables " in {
     val db = fixture.dbUnderTest
-    import db.runContext.ds
-    import db.runContext.executor
+
+    import db.syncRunContext
     val time = new Date()
 
     FutureTx.sequence((0 to 100) map { i =>
@@ -218,8 +217,8 @@ class DbV2Spec extends DbSpecSetup {
   it should "support views" in {
 
     val db = fixture.dbUnderTest
-    import db.runContext.ds
-    import db.runContext.executor
+    import db.syncRunContext
+
 
     val time = new Date()
 
@@ -244,8 +243,8 @@ class DbV2Spec extends DbSpecSetup {
   it should " support optimistic locking using the version field " in {
 
     val db = fixture.dbUnderTest
-    import db.runContext.ds
-    import db.runContext.executor
+
+    import db.syncRunContext
 
     val time = new Date()
 
@@ -268,8 +267,8 @@ class DbV2Spec extends DbSpecSetup {
   it should "throw exception if optimistic locking clash happens" in {
 
     val db = fixture.dbUnderTest
-    import db.runContext.ds
-    import db.runContext.executor
+    import db.syncRunContext
+
     val table = db.table("testVersion")
 
     val result = (for {
@@ -291,8 +290,8 @@ class DbV2Spec extends DbSpecSetup {
   it should " support use of boolean fields " in {
 
     val db = fixture.dbUnderTest
-    import db.runContext.ds
-    import db.runContext.executor
+    import db.syncRunContext
+    import db.syncRunContext.executor
     val table = db.table("testBool")
 
     val f = table.persist(Map("boolVal" -> false)).runSyncAndGet
@@ -308,8 +307,8 @@ class DbV2Spec extends DbSpecSetup {
 
   it should " get the id of a row given criteria " in {
     val db = fixture.dbUnderTest
-    import db.runContext.ds
-    import db.runContext.executor
+
+    import db.syncRunContext
     val table = db.table("test")
 
     val r = table.insert(Map("strId" -> "hellothere")).runSyncAndGet
@@ -320,8 +319,8 @@ class DbV2Spec extends DbSpecSetup {
   it should " get the ids of many rows given criteria " in {
 
     val db = fixture.dbUnderTest
-    import db.runContext.ds
-    import db.runContext.executor
+    import db.syncRunContext
+
     val table = db.table("test")
 
     val rowsIds = FutureTx.sequence(
@@ -337,8 +336,8 @@ class DbV2Spec extends DbSpecSetup {
   it should " get the Int ids of many rows given criteria " in {
 
     val db = fixture.dbUnderTest
-    import db.runContext.ds
-    import db.runContext.executor
+    import db.syncRunContext
+
 
     val table = db.table("testIntId")
 
@@ -357,8 +356,8 @@ class DbV2Spec extends DbSpecSetup {
   it should " get the maximum value of a column " in {
 
     val db = fixture.dbUnderTest
-    import db.runContext.ds
-    import db.runContext.executor
+    import db.syncRunContext
+
 
     val table = db.table("testIntId")
     val currentMax = table.maxId().runSyncAndGet
@@ -386,8 +385,8 @@ class DbV2Spec extends DbSpecSetup {
   it should "insert Enumeration Values" in {
 
     val db = fixture.dbUnderTest
-    import db.runContext.ds
-    import db.runContext.executor
+    import db.syncRunContext
+
 
     object TestEnum extends Enumeration {
       type TestEnum = Value

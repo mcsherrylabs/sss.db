@@ -17,7 +17,7 @@ class PagedViewSpec extends DbSpecSetup {
   "A paged View" should " be able to handle an empty table " in {
 
     val db = fixture.dbUnderTest
-    import db.runContext._
+    import db.syncRunContext
 
     view.delete(where("1 = 1"))
     val pv = PagedView(view, 2, where(s"$statusCol = ? ", 0), idCol)
@@ -32,7 +32,7 @@ class PagedViewSpec extends DbSpecSetup {
   it should " be able to scroll back through 5 pages " in {
 
     val db = fixture.dbUnderTest
-    import db.runContext._
+    import db.syncRunContext
 
     (1 to 10) foreach { i => view.insert(Map(idCol -> i, statusCol -> 0)).runSyncAndGet }
 
@@ -55,7 +55,7 @@ class PagedViewSpec extends DbSpecSetup {
   it should " match expected walk exactly " in {
 
     val db = fixture.dbUnderTest
-    import db.runContext._
+    import db.syncRunContext
 
     (1 to 10) foreach { i => view.insert(Map(idCol -> i, statusCol -> 0)).runSyncAndGet  }
     val pv = PagedView(view, 3, where (statusCol -> 0), idCol)
@@ -93,7 +93,7 @@ class PagedViewSpec extends DbSpecSetup {
   it should " respect the status column " in {
 
     val db = fixture.dbUnderTest
-    import db.runContext._
+    import db.syncRunContext
 
     (1 to 10) foreach { i => view2.insert(Map(idCol -> i, statusCol -> 0)).runSyncAndGet  }
     Seq(2,4,6,8) foreach { i => view2.updateRow(Map(idCol -> i, statusCol -> 1)).runSyncAndGet  }
@@ -118,7 +118,7 @@ class PagedViewSpec extends DbSpecSetup {
   it should " work without a filter " in {
 
     val db = fixture.dbUnderTest
-    import db.runContext._
+    import db.syncRunContext
 
     (1 to 10) foreach { i => view2.insert(Map(idCol -> i, statusCol -> 0)).runSyncAndGet }
 

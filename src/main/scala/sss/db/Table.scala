@@ -13,10 +13,17 @@ class Table private[db] (name: String,
     freeBlobsEarly,
     columns) {
 
+  @deprecated("This causes an implicit commit in some databases")
   def setNextIdToMaxIdPlusOne(): FutureTx[Boolean] = {
     maxId().flatMap(max => setNextId(max + 1))
   }
 
+  /**
+    *
+    * @param next
+    * @return
+    */
+  @deprecated("This causes an implicit commit in some databases")
   def setNextId(next: Long): FutureTx[Boolean] = { context =>
     LoggingFuture {
 
@@ -170,6 +177,28 @@ class Table private[db] (name: String,
     val params = (0 until values.size).map(x => "?").mkString(",")
     val sql = s"INSERT INTO ${name} VALUES ( ${params})"
     prepareStatement(sql, values.toSeq, Some(Statement.RETURN_GENERATED_KEYS)) map { ps =>
+      try {
+        ps.executeUpdate() // run the query
+      } finally {
+        ps.close()
+      }
+    }
+  }
+
+
+  /**
+  Use when there is no identity column to insert a row
+    *
+    * @param values
+    * @return
+    */
+  def insertNoIdentity(values: Map[String, Any]): FutureTx[Int] = {
+
+    val names = values.keys.mkString(",")
+    val params = (0 until values.keys.size).map(x => "?").mkString(",")
+
+    val sql = s"INSERT INTO ${name} (${names}) VALUES ( ${params})"
+    prepareStatement(sql, values.values.toSeq).map { ps =>
       try {
         ps.executeUpdate() // run the query
       } finally {

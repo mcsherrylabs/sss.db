@@ -31,10 +31,8 @@ class SetIsolationLevelSupportSpec extends DbSpecSetup {
   it should "support TRANSACTION_SERIALIZABLE " in {
 
     val db = fixture.dbUnderTest
-    implicit val cntxt = db.runContext(TxIsolationLevel.SERIALIZABLE)
-    import cntxt.ds
-    import cntxt.executor
-
+    implicit val cntxt = new AsyncRunContext(db.asyncRunContext.ds, db.asyncRunContext.ec, Some(TxIsolationLevel.SERIALIZABLE), db.asyncRunContext.executor)
+    import db.syncRunContext
 
     val testCount = 100
 

@@ -1,12 +1,11 @@
 package sss.db
 
-import sss.ancillary.FutureOps.AwaitReady
 import sss.db.TxIsolationLevel.TxIsolationLevel
 
 import java.sql.Connection
 import javax.sql.DataSource
 import scala.concurrent.duration.{Duration, DurationInt}
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 
 trait FutureTxExecutor {
@@ -17,7 +16,7 @@ trait FutureTxExecutor {
                  ec: ExecutionContext,
                  isolationLevel: Option[TxIsolationLevel]): Future[T] = {
 
-    implicit val ecImplicit = ec
+    implicit val ecImplicit: ExecutionContext = ec
 
     Try {
       isolationLevel.foreach(l => conn.setTransactionIsolation(l.id))
@@ -49,16 +48,19 @@ trait FutureTxExecutor {
     }
   }
 
-  def execute[T](fTx: FutureTx[T], runContext: RunContext, isRollback: Boolean): Future[T] = {
+  def execute[T](fTx: FutureTx[T], runContext: AsyncRunContext, isRollback: Boolean): Future[T] = {
     execute(fTx, runContext.ds.getConnection, isRollback, runContext.ec, runContext.isolationLevel)
   }
 
 
   def executeSync[T](fTx: FutureTx[T],
                      ds: DataSource,
-                     isRollback: Boolean, isolationLevel: Option[TxIsolationLevel]): Try[T] = {
+                     isRollback: Boolean,
+                     isolationLevel: Option[TxIsolationLevel],
+                     timeout: Duration): Try[T] = Try {
     val ec = ExecutionContextHelper.synchronousExecutionContext
-    execute(fTx, ds.getConnection, isRollback, ec, isolationLevel).toTry(1.second)
+    val conn = ds.getConnection
+    Await.result(execute(fTx, conn, isRollback, ec, isolationLevel), timeout)
   }
 
 

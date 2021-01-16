@@ -28,8 +28,8 @@ trait DbSpecSetupBase extends Matchers with BeforeAndAfter {
 
   after {
     val db = fixture.dbUnderTest
-    import db.runContext.ds
-    import db.runContext.executor
+    import db.syncRunContext
+    import db.syncRunContext.executor
     fixture.dbUnderTest.shutdown.runSyncAndGet
   }
 

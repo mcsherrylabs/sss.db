@@ -24,8 +24,8 @@ class ParallelThreadSupportSpec extends DbSpecSetup {
   it should "support consistent parallel threaded access" in {
 
     val db = fixture.dbUnderTest
-    import db.runContext
-    import db.runContext._
+    import db.syncRunContext
+    import db.asyncRunContext
 
 
     val effects = for {

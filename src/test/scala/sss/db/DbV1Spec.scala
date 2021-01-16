@@ -1,9 +1,10 @@
 package sss.db
 
 import java.util.Date
-
 import org.scalatest.DoNotDiscover
 import sss.db.WhereOps.toWhere
+import sss.db.ops.DbOps.DbRunOps
+
 import scala.util.control.NonFatal
 
 @DoNotDiscover
@@ -13,8 +14,8 @@ class DbV1Spec extends DbSpecSetup {
   "A Db" should " allow insert into existing table " in {
 
     val db = fixture.dbUnderTest
-    import db.runContext.ds
-    import db.runContext.executor
+    import db.syncRunContext
+    import db.syncRunContext.executor
 
     val numInserted = fixture.table.insert(0, "strId", new Date().getTime, 42).runSync.get
     assert(numInserted == 1, s"Should be 1 row created not ${numInserted}!")
@@ -23,8 +24,8 @@ class DbV1Spec extends DbSpecSetup {
   it should " be able to read all rows from a table " in {
 
     val db = fixture.dbUnderTest
-    import db.runContext.ds
-    import db.runContext.executor
+    import db.syncRunContext
+    import db.syncRunContext.executor
 
     val time = new Date()
     val rowsT = for {
@@ -43,10 +44,9 @@ class DbV1Spec extends DbSpecSetup {
 
   it should " be able to read all rows from a table (in order!) " in {
 
-
     val db = fixture.dbUnderTest
-    import db.runContext.ds
-    import db.runContext.executor
+    import db.syncRunContext
+    import db.syncRunContext.executor
 
     val time = new Date()
 
@@ -71,8 +71,8 @@ class DbV1Spec extends DbSpecSetup {
   it should " be able to find the row inserted " in {
 
     val db = fixture.dbUnderTest
-    import db.runContext.ds
-    import db.runContext.executor
+    import db.syncRunContext
+    import db.syncRunContext.executor
 
     val time = new Date()
     fixture.table.insert(0, "strId", time, 45).runSync
@@ -87,8 +87,8 @@ class DbV1Spec extends DbSpecSetup {
   it should " support shorthand filter" in {
 
     val db = fixture.dbUnderTest
-    import db.runContext.ds
-    import db.runContext.executor
+    import db.syncRunContext
+    import db.syncRunContext.executor
 
     val time = new Date()
     fixture.table.insert(3456, "strId", time, 45).runSync
@@ -102,8 +102,8 @@ class DbV1Spec extends DbSpecSetup {
 
   it should " be able to find the row inserted by id " in {
     val db = fixture.dbUnderTest
-    import db.runContext.ds
-    import db.runContext.executor
+    import db.syncRunContext
+    import db.syncRunContext.executor
 
     val time = new Date()
     (fixture.table.insert(99, "strId", time, 45) flatMap { i =>
@@ -117,8 +117,8 @@ class DbV1Spec extends DbSpecSetup {
   it should " be able to find the row searching by field name " in {
 
     val db = fixture.dbUnderTest
-    import db.runContext.ds
-    import db.runContext.executor
+    import db.syncRunContext
+    import db.syncRunContext.executor
 
     val time = new Date()
 
@@ -136,8 +136,8 @@ class DbV1Spec extends DbSpecSetup {
   it should " support shorthand find " in {
 
     val db = fixture.dbUnderTest
-    import db.runContext.ds
-    import db.runContext.executor
+    import db.syncRunContext
+    import db.syncRunContext.executor
 
     val time = new Date()
     val p = for {
@@ -154,8 +154,8 @@ class DbV1Spec extends DbSpecSetup {
   it should " not be able to find a single row when 2 are present " in {
 
     val db = fixture.dbUnderTest
-    import db.runContext.ds
-    import db.runContext.executor
+    import db.syncRunContext
+    import db.syncRunContext.executor
 
     val time = new Date()
 
@@ -175,8 +175,8 @@ class DbV1Spec extends DbSpecSetup {
   it should "support a transaction" in {
     val time = new Date()
     val db = fixture.dbUnderTest
-    import db.runContext.ds
-    import db.runContext.executor
+    import db.syncRunContext
+    import db.syncRunContext.executor
 
     val p = for {
       _ <- fixture.table.insert(999999, "strId", time, 45)
@@ -192,8 +192,8 @@ class DbV1Spec extends DbSpecSetup {
   it should "correctly find using 'in' syntax" in {
     val time = new Date()
     val db = fixture.dbUnderTest
-    import db.runContext.ds
-    import db.runContext.executor
+    import db.syncRunContext
+    import db.syncRunContext.executor
 
     val plan = for {
       _ <- fixture.table.insert(999999, "strId", time, 45)
@@ -211,8 +211,8 @@ class DbV1Spec extends DbSpecSetup {
   it should "correctly find using 'not in' syntax" in {
     val time = new Date()
     val db = fixture.dbUnderTest
-    import db.runContext.ds
-    import db.runContext.executor
+    import db.syncRunContext
+    import db.syncRunContext.executor
 
     val plan = for {
       _ <- fixture.table.insert(999999, "strId", time, 45)
@@ -229,8 +229,8 @@ class DbV1Spec extends DbSpecSetup {
   it should "correctly find using 'in' syntax with orderby and limit " in {
     val time = new Date()
     val db = fixture.dbUnderTest
-    import db.runContext.ds
-    import db.runContext.executor
+    import db.syncRunContext
+    import db.syncRunContext.executor
 
     val plan = for {
       _ <- fixture.table.insert(999999, "strId", time, 45)
@@ -246,8 +246,8 @@ class DbV1Spec extends DbSpecSetup {
   it should "correctly find using existing where plus 'in' syntax with orderby and limit " in {
     val time = new Date()
     val db = fixture.dbUnderTest
-    import db.runContext.ds
-    import db.runContext.executor
+    import db.syncRunContext
+    import db.syncRunContext.executor
 
     val plan = for {
       _ <- fixture.table.insert(999999, "strId", time, 45)
@@ -268,8 +268,8 @@ class DbV1Spec extends DbSpecSetup {
   it should "correctly filter using None syntax " in {
 
     val db = fixture.dbUnderTest
-    import db.runContext.ds
-    import db.runContext.executor
+    import db.syncRunContext
+    import db.syncRunContext.executor
 
     val table = fixture.dbUnderTest.table("testBinary")
 
@@ -290,8 +290,8 @@ class DbV1Spec extends DbSpecSetup {
   it should "correctly filter using is Not Null syntax " in {
 
     val db = fixture.dbUnderTest
-    import db.runContext.ds
-    import db.runContext.executor
+    import db.syncRunContext
+    import db.syncRunContext.executor
 
 
     val table = fixture.dbUnderTest.table("testBinary")
@@ -313,9 +313,9 @@ class DbV1Spec extends DbSpecSetup {
   it should "correctly filter using is Null syntax " in {
 
     val db = fixture.dbUnderTest
-    import db.runContext.ds
+    import db.syncRunContext
     import IsNull._
-    import db.runContext.executor
+    import db.syncRunContext.executor
 
     val table = fixture.dbUnderTest.table("testBinary")
 
@@ -334,4 +334,41 @@ class DbV1Spec extends DbSpecSetup {
 
   }
 
+  it should "be able to insert into a table with no identity column" in {
+    implicit val db = fixture.dbUnderTest
+    val table = db.table("testNoIdentity")
+    val colName = "boolval"
+    val inRows = Seq(
+      Map(
+        "id" -> 1,
+        colName -> true
+      ),
+      Map(
+        "id" -> 2,
+        colName -> false
+      ),
+
+      Map(
+        "id" -> 3,
+        colName -> true
+      )
+    )
+    table.insertNoIdentity(inRows(0)).dbRunSyncGet
+    table.insertNoIdentity(inRows(1)).dbRunSyncGet
+    table.insertNoIdentity(inRows(2)).dbRunSyncGet
+
+    val seqRows = table.map(identity).dbRunSyncGet.map(_.asMap)
+
+    seqRows shouldBe inRows
+
+    //should insert SECOND ROW (no Primary key)
+    table.insertNoIdentity(Map(
+      "id" -> 2,
+      colName -> true
+    )).dbRunSyncGet
+
+    table.map(identity, where("id" -> 2))
+      .dbRunSyncGet
+      .map(_.boolean(colName)) shouldBe Seq(false, true)
+  }
 }

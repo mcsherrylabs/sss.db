@@ -1,7 +1,7 @@
 
 name := "sss-db"
 
-version := "0.9.45"
+version := "0.9.47"
 
 scalaVersion := "2.13.4"
 

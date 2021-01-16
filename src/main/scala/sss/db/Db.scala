@@ -8,6 +8,7 @@ import sss.db.datasource.DataSource
 import sss.db.datasource.DataSource._
 
 import scala.concurrent.ExecutionContext
+import scala.concurrent.duration.DurationInt
 import scala.util.Try
 
 
@@ -46,13 +47,14 @@ class Db(dbConfig: DbConfig)(closeableDataSource:CloseableDataSource, ec: Execut
 
   if(dbConfig.useShutdownHook) sys addShutdownHook shutdown
 
-  DbInitialSqlExecutor(dbConfig: DbConfig, executeSql)(closeableDataSource)
+  val defaultSyncContextTransactionTimeout = 3.seconds
 
-  implicit val runContext: RunContext = new RunContext(closeableDataSource, ec)
+  implicit val syncRunContext: SyncRunContext = new SyncRunContext(closeableDataSource, defaultSyncContextTransactionTimeout)
+  implicit val asyncRunContext: AsyncRunContext = new AsyncRunContext(closeableDataSource, ec)
 
-  def runContext(level: TxIsolationLevel): RunContext = new RunContext(closeableDataSource, ec, Option(level))
+  DbInitialSqlExecutor(dbConfig: DbConfig, executeSql)(syncRunContext)
 
-  def table(name: String): Table =  new Table(name, runContext, dbConfig.freeBlobsEarly)
+  def table(name: String): Table =  new Table(name, syncRunContext, dbConfig.freeBlobsEarly)
 
   /*
   Views - they're great!
@@ -66,13 +68,13 @@ class Db(dbConfig: DbConfig)(closeableDataSource:CloseableDataSource, ec: Execut
 
   TL;DR for blockchain type applications views are a good solution.
    */
-  def view(name: String): View = new View(name, runContext, dbConfig.freeBlobsEarly)
+  def view(name: String): View = new View(name, syncRunContext, dbConfig.freeBlobsEarly)
 
   def dropView(viewName: String): FutureTx[Int] = executeSql(s"DROP VIEW ${viewName}")
 
   def createView(createViewSql: String): FutureTx[Int] = executeSql(createViewSql)
 
-  def select(sql: String): Query = new Query(sql, runContext, dbConfig.freeBlobsEarly)
+  def select(sql: String): Query = new Query(sql, syncRunContext, dbConfig.freeBlobsEarly)
 
 
   def shutdown: FutureTx[Int] = {
@@ -95,15 +97,18 @@ class Db(dbConfig: DbConfig)(closeableDataSource:CloseableDataSource, ec: Execut
   /**
     * Execute any sql you give it on a db connection in a transaction
     * .
+    *
     * @param sql - sql to execute
     * @return
     * @note This is a gateway for sql injection attacks, use with extreme caution.
     */
-  def executeSql(sql: String):FutureTx[Int] = { context =>
-    val st = context.conn.createStatement()
-    try {
-      LoggingFuture(st.executeUpdate(sql))(context.ec)
-    } finally st.close()
+  def executeSql(sql: String): FutureTx[Int] = { context =>
+    LoggingFuture {
+      val st = context.conn.createStatement()
+      try {
+        st.executeUpdate(sql)
+      } finally st.close()
+    }(context.ec)
   }
 
 

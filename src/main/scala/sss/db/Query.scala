@@ -7,6 +7,7 @@ import org.joda.time.LocalDate
 import sss.ancillary.{Logging, LoggingFutureSupport}
 
 import scala.collection.WithFilter
+import scala.concurrent.Future
 
 //import scala.collection.generic.FilterMonadic
 import scala.collection.mutable

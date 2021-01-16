@@ -52,8 +52,8 @@ class BlobStoreSpec extends DbSpecSetup {
   it should "support writing File to BLOB" in {
 
     val db = fixture.dbUnderTest
-    import db.runContext.ds
-    import db.runContext.executor
+    import db.syncRunContext
+    import db.syncRunContext.executor
     val start = System.currentTimeMillis()
 
     val numB = KB * 10
@@ -109,8 +109,8 @@ class BlobStoreSpec extends DbSpecSetup {
   it should " support persisting a byte as Binary" in {
 
     val db = fixture.dbUnderTest
-    import db.runContext.ds
-    import db.runContext.executor
+    import db.syncRunContext
+    import db.syncRunContext.executor
     val table = db.table("testBinary")
 
     val testByte: Byte = 34
@@ -132,8 +132,8 @@ class BlobStoreSpec extends DbSpecSetup {
     val testStr = "Hello My Friend"
 
     val db = fixture.dbUnderTest
-    import db.runContext.ds
-    import db.runContext.executor
+    import db.syncRunContext
+    import db.syncRunContext.executor
     val table = db.table("testBinary")
 
     val plan = for {
@@ -148,8 +148,8 @@ class BlobStoreSpec extends DbSpecSetup {
   it should "support persisting wrapped binary arrays as a blob" in {
 
     val db = fixture.dbUnderTest
-    import db.runContext.ds
-    import db.runContext.executor
+    import db.syncRunContext
+    import db.syncRunContext.executor
     val table = db.table("testBinary")
 
     val testStr = "Hello My Friend"
@@ -169,8 +169,8 @@ class BlobStoreSpec extends DbSpecSetup {
   it should "support find along binary arrays" in {
 
     val db = fixture.dbUnderTest
-    import db.runContext.ds
-    import db.runContext.executor
+    import db.syncRunContext
+    import db.syncRunContext.executor
     val table = db.table("testBinary")
     val testStr = "Hello My Friend"
     val bytes = testStr.getBytes
@@ -190,8 +190,8 @@ class BlobStoreSpec extends DbSpecSetup {
   it should " NOT support find along wrapped binary arrays (you must use .array)" in {
 
     val db = fixture.dbUnderTest
-    import db.runContext.ds
-    import db.runContext.executor
+    import db.syncRunContext
+    import db.syncRunContext.executor
     val table = db.table("testBinary")
 
     val testStr = "Hello My Friend"
@@ -213,8 +213,8 @@ class BlobStoreSpec extends DbSpecSetup {
   it should "support inputstream result" in {
 
     val db = fixture.dbUnderTest
-    import db.runContext.ds
-    import db.runContext.executor
+    import db.syncRunContext.ds
+    import db.syncRunContext
     val table = db.table("testBinary")
     val testStr = "Hello My Friend"
     val bytes = testStr.getBytes

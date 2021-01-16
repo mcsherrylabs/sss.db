@@ -10,7 +10,7 @@ import scala.util.{Failure, Success, Try}
 
 object DbInitialSqlExecutor extends Logging {
 
-  def apply(dbConfig: DbConfig, executeSql: String => FutureTx[Int])(implicit ds: DataSource, executor: FutureTxExecutor = FutureTxExecutor): Unit = {
+  def apply(dbConfig: DbConfig, executeSql: String => FutureTx[Int])(implicit syncRunContext: SyncRunContext): Unit = {
 
       dbConfig.deleteSqlOpt foreach { deleteSqlAry =>
 

@@ -1,8 +1,11 @@
 package sss.db
 
 import org.scalatest.DoNotDiscover
-
-import scala.util.{Success, Try}
+import sss.db.ops.DbOps.EitherFutureTxOps
+import sss.db.ops.DbOps.TryFutureTxOps
+import scala.concurrent.{Await, Future}
+import scala.concurrent.duration.{Duration, DurationInt}
+import scala.util.{Failure, Success, Try}
 
 @DoNotDiscover
 class ForComprehensionSpec extends DbSpecSetup {
@@ -11,14 +14,14 @@ class ForComprehensionSpec extends DbSpecSetup {
   "A paged view " should "support a paged stream generator " in {
 
     val db = fixture.dbUnderTest
-    import db.runContext.ds
-    import db.runContext.executor
+    import db.syncRunContext
+
 
     for {
       x <- 0 until 100
-      _ = db.table("testForComp").insert(x, x+1, "strId" + x).runSyncAndGet
+      r = db.table("testForComp").insert(x, x+1, "strId" + x).runSyncAndGet
 
-    } yield ()
+    } yield r
 
     var rs: LazyList[Row] = fixture.dbUnderTest.table("testForComp").toPaged(2).toStream
     val rows = for {
@@ -41,8 +44,8 @@ class ForComprehensionSpec extends DbSpecSetup {
   def createAndFillTenTables: Seq[String] = {
 
     val db = fixture.dbUnderTest
-    import db.runContext.ds
-    import db.runContext.executor
+
+    import db.syncRunContext
 
     //create 10 tables
     val tableNames = for {
@@ -69,8 +72,8 @@ class ForComprehensionSpec extends DbSpecSetup {
   it should " support paged iterator generator " in {
 
     val db = fixture.dbUnderTest
-    import db.runContext.ds
-    import db.runContext.executor
+    import db.syncRunContext
+
 
     val tableNames = createAndFillTenTables
     // go through each table in a paged manner and find all the rows
@@ -95,8 +98,8 @@ class ForComprehensionSpec extends DbSpecSetup {
   it should " support rollback in transactions using Try " in {
 
     val db = fixture.dbUnderTest
-    import db.runContext.ds
-    import db.runContext.executor
+    import db.syncRunContext
+
     val x = 1000
     val t = fixture.dbUnderTest.table("testForComp")
 
@@ -124,8 +127,8 @@ class ForComprehensionSpec extends DbSpecSetup {
   it should " support nested generator (thru flatMap) " in {
 
     val db = fixture.dbUnderTest
-    import db.runContext.ds
-    import db.runContext.executor
+    import db.syncRunContext
+
 
     val tableNames = createAndFillTenTables
 
@@ -153,8 +156,8 @@ class ForComprehensionSpec extends DbSpecSetup {
   it should " support FutureTx nested generator (thru flatMap) " in {
 
     val db = fixture.dbUnderTest
-    import db.runContext.ds
-    import db.runContext.executor
+    import db.syncRunContext
+
 
 
     val tableNames = createAndFillTenTables
@@ -190,4 +193,115 @@ class ForComprehensionSpec extends DbSpecSetup {
     }.runSyncAndGet
 
   }
+
+  it should "sequence in order" in {
+    val db = fixture.dbUnderTest
+
+    import db.syncRunContext
+
+    val seq = Seq(1,2,3)
+    val resultSeq = FutureTx.sequence(seq.map(FutureTx.unit)).runSyncAndGet
+    resultSeq shouldBe seq
+
+  }
+
+  it should "catch lazy unit failure" in {
+    val db = fixture.dbUnderTest
+
+    import db.syncRunContext
+
+    val rte = new RuntimeException("")
+    val ran = FutureTx.lazyUnit(throw rte).runSync
+    ran shouldBe Failure(rte)
+  }
+
+  it should "catch failure in for" in {
+    val db = fixture.dbUnderTest
+    import db.syncRunContext
+
+    val t = fixture.dbUnderTest.table("testForComp")
+    val x = 1000
+
+    def goodTx(i: Int) = t.insert(x + i, i + 1, "strId" + i)
+
+    val race = for {
+      _ <- goodTx(9)
+      _ <- goodTx(10)
+      _ = throw new RuntimeException("FAILED")
+      _ <- goodTx(19)
+      read <- t.filter(where(idCol) in Set((x+9),(x+10),(x+19)))
+    } yield read
+
+    val r = race.runSyncRollback
+    assert(r.isFailure, "Should fail")
+
+    val r2 = race.runSync
+    assert(r2.isFailure, "Should fail")
+
+  }
+  it should "support rollback" in {
+
+    val db = fixture.dbUnderTest
+    import db.syncRunContext
+    val t = fixture.dbUnderTest.table("testForComp")
+    val x = 1000
+
+    def goodTx(i: Int) = t.insert(x + i, i + 1, "strId" + i)
+
+    def readTx = fixture.table.map(identity)
+
+    val race = for {
+      _ <- goodTx(9)
+      _ <- goodTx(10)
+      _ <- goodTx(19)
+      read <- t.filter(where(idCol) in Set((x+9),(x+10),(x+19)))
+    } yield read
+
+    val r = race.runSyncRollbackAndGet
+
+    r.size shouldBe 3
+    val goneAfterRollback = t.filter(where(idCol) in Set((x+9),(x+10),(x+19))).runSyncAndGet
+    goneAfterRollback.size shouldBe 0
+  }
+
+  it should "correctly unwrap Option" in {
+    import ops.DbOps.OptFutureTxOps
+    implicit val db = fixture.dbUnderTest
+    import db.syncRunContext
+    val futOp = Option(FutureTx.unit("Hello")).toFutureTxOpt.runSyncAndGet
+    assert(futOp.contains("Hello"))
+
+    val futOpFail = Option(FutureTx.lazyUnit(throw new RuntimeException(""))).toFutureTxOpt.runSync
+    assert(futOpFail.isFailure)
+  }
+
+  it should "correctly unwrap Either" in {
+
+    implicit val db = fixture.dbUnderTest
+    import db.syncRunContext
+    val futEither = Left("Hello").toFutureTxEither.runSyncAndGet
+    assert(futEither == Left("Hello"))
+
+    val futEither2 = Right(FutureTx.unit("Hello")).toFutureTxEither.runSyncAndGet
+    assert(futEither2 == Right("Hello"))
+  }
+
+
+  it should "correctly unwrap Try" in {
+
+    implicit val db = fixture.dbUnderTest
+    import db.syncRunContext
+    val futEither = Try(FutureTx.unit("Hello")).toFutureTxTry.runSyncAndGet
+    assert(futEither == Success("Hello"))
+
+    val rte = new RuntimeException("")
+
+    val futEither2 = Try(FutureTx.lazyUnit(throw rte)).toFutureTxTry.runSync
+    assert(futEither2 == Failure(rte))
+
+
+    val futEither3 = Failure(rte).toFutureTxTry.runSyncAndGet
+    assert(futEither3 == Failure(rte))
+  }
 }
+

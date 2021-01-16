@@ -74,12 +74,12 @@ object PagedView {
     * @return
     */
   implicit class ToIterator(val pagedView: PagedView) extends AnyVal {
-    def toIterator(implicit dataSource: DataSource): Iterator[Row] = ToStream(pagedView).toStream.iterator
+    def toIterator(implicit  syncRunContext: SyncRunContext): Iterator[Row] = ToStream(pagedView).toStream.iterator
   }
 
   implicit class ToStream(val pagedView: PagedView) extends AnyVal {
 
-    def toStream(implicit dataSource: DataSource, executor: FutureTxExecutor = FutureTxExecutor): LazyList[Row] = {
+    def toStream(implicit syncRunContext: SyncRunContext): LazyList[Row] = {
 
       def toStream(fPage: FutureTx[Option[Page]]): LazyList[Rows] = {
 
@@ -108,7 +108,7 @@ class PagedView private(view: Query,
     */
 
 
-  def iterator(implicit dataSource: DataSource): Iterator[Row] = new ToIterator(this).toIterator
+  def iterator(implicit syncRunContext: SyncRunContext): Iterator[Row] = new ToIterator(this).toIterator
 
   def lastPage: FutureTx[Option[Page]] = {
 

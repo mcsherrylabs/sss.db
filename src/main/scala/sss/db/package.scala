@@ -15,6 +15,7 @@ import sss.db.TxIsolationLevel.TxIsolationLevel
 import java.util
 import java.util.Locale
 import scala.collection.mutable
+import scala.concurrent.duration.Duration
 import scala.concurrent.{ExecutionContext, Future}
 import scala.language.implicitConversions
 import scala.util.{Failure, Success, Try}
@@ -77,42 +78,66 @@ package object db extends Logging {
     val SERIALIZABLE = Value(Connection.TRANSACTION_SERIALIZABLE)
   }
 
-  class RunContext(aDs: DataSource,
+  trait RunContext {
+    implicit val ds: DataSource
+    implicit val executor: FutureTxExecutor
+    val isolationLevel: Option[TxIsolationLevel]
+  }
+
+  class AsyncRunContext(aDs: DataSource,
                    anEc: ExecutionContext,
                    val isolationLevel: Option[TxIsolationLevel] = None,
                    anExecutor: FutureTxExecutor = FutureTxExecutor
-                  ) {
+                  ) extends RunContext {
     implicit val ds: DataSource = aDs
     implicit val ec: ExecutionContext = anEc
     implicit val executor: FutureTxExecutor = anExecutor
   }
 
+  class SyncRunContext(aDs: DataSource,
+                       val timeout: Duration,
+                       val isolationLevel: Option[TxIsolationLevel] = None,
+                       anExecutor: FutureTxExecutor = FutureTxExecutor
+                      ) extends RunContext {
+    implicit val ds: DataSource = aDs
+    implicit val executor: FutureTxExecutor = anExecutor
+
+  }
+
   implicit class RunOp[T](val t: FutureTx[T]) extends AnyVal {
-    def run(implicit runContext: RunContext): Future[T] = {
+    def run(implicit runContext: AsyncRunContext): Future[T] = {
       runContext.executor.execute(t, runContext, false)
     }
 
-    def runRollback(implicit runContext: RunContext): Future[T] = {
+    def runRollback(implicit runContext: AsyncRunContext): Future[T] = {
       runContext.executor.execute(t, runContext, true)
     }
   }
 
   implicit class RunSyncOp[T](val t: FutureTx[T]) extends AnyVal {
 
-    def runSync(implicit d: DataSource,
-                executor: FutureTxExecutor,
-                isolationLevel: Option[TxIsolationLevel] = None): Try[T] = {
-      executor.executeSync(t, d, false, isolationLevel)
+    def runSync(implicit runContext: SyncRunContext): Try[T] = {
+      runContext.executor.executeSync(
+        t,
+        runContext.ds,
+        false,
+        runContext.isolationLevel,
+        runContext.timeout
+      )
     }
 
-    def runSyncRollback(implicit d: DataSource,
-                        executor: FutureTxExecutor,
-                        isolationLevel: Option[TxIsolationLevel] = None): Try[T] = {
-      executor.executeSync(t, d, true, isolationLevel)
+    def runSyncRollback(implicit runContext: SyncRunContext): Try[T] = {
+      runContext.executor.executeSync(
+        t,
+        runContext.ds,
+        true,
+        runContext.isolationLevel,
+        runContext.timeout
+      )
     }
 
-    def runSyncAndGet(implicit d: DataSource, executor: FutureTxExecutor): T = runSync.get
-    def runSyncRollbackAndGet(implicit d: DataSource, executor: FutureTxExecutor): T = runSyncRollback.get
+    def runSyncAndGet(implicit runContext: SyncRunContext): T = runSync.get
+    def runSyncRollbackAndGet(implicit runContext: SyncRunContext): T = runSyncRollback.get
   }
 
   implicit class SqlHelper(val sc: StringContext) extends AnyVal {

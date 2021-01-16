@@ -17,9 +17,9 @@ class ValidateTransactionSpec extends DbSpecSetup {
   "A Transaction" should "validate without being persisted" in {
 
     val db = fixture.dbUnderTest
-    import db.runContext
-    import db.runContext._
-
+    import db.syncRunContext
+    import db.asyncRunContext.ec
+    import db.asyncRunContext
 
     val time = new Date()
 
@@ -37,9 +37,10 @@ class ValidateTransactionSpec extends DbSpecSetup {
     val time = new Date()
 
     val db = fixture.dbUnderTest
-    import db.runContext
+    import db.syncRunContext
 
-    import db.runContext._
+    import db.asyncRunContext
+    import db.asyncRunContext.ec
 
 
     val f = for {
@@ -62,8 +63,9 @@ class ValidateTransactionSpec extends DbSpecSetup {
     val time = new Date()
 
     val db = fixture.dbUnderTest
-    import db.runContext
-    import db.runContext._
+    import db.syncRunContext
+    import db.asyncRunContext
+    import db.asyncRunContext.ec
 
     val currentMax = fixture.table.maxId().runSyncAndGet
 
