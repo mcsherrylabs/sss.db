@@ -36,7 +36,7 @@ class Table private[db] (name: String,
   }
 
   @throws[DbOptimisticLockingException]("if the row has been updated after you read it")
-  def update(values: Map[String, Any], where: Where, updateVersionCol: Boolean = false): FutureTx[Unit] = {
+  def update(values: Map[String, Any], where: Where, updateVersionCol: Boolean = false): FutureTx[Int] = {
 
     val params = values.keys.map(k => s"$k = ?").mkString(",")
 
@@ -48,6 +48,7 @@ class Table private[db] (name: String,
       try {
         val numRows = ps.executeUpdate()
         if (updateVersionCol && numRows == 0) throw new DbOptimisticLockingException(s"No rows were updated, optimistic lock clash? ${name}:${values}:$where")
+        numRows
       } finally {
         ps.close()
       }

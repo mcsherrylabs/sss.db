@@ -34,9 +34,12 @@ trait FutureTx[+T] extends (TransactionContext => Future[T]) {
 }
 
 object FutureTx {
-  def unit[A](a: A): FutureTx[A] = conn => Future.successful(a)
 
-  def lazyUnit[A](a: => A): FutureTx[A] = conn => Future.successful(a)
+  def failed[A](e: Throwable): FutureTx[A] = _ => Future.failed(e)
+
+  def unit[A](a: A): FutureTx[A] = _ => Future.successful(a)
+
+  def lazyUnit[A](a: => A): FutureTx[A] = _ => Future.successful(a)
 
   def sequence[T](seqT: Seq[FutureTx[T]]): FutureTx[Seq[T]] = {
     seqT.foldLeft[FutureTx[Seq[T]]](FutureTx.unit(Seq.empty[T])) {

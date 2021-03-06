@@ -56,6 +56,14 @@ object DbOps {
 
   }
 
+  implicit class FutureTryTxOps[T](val tryFutTx: FutureTx[Try[T]]) extends AnyVal {
+
+    def unwrapTry: FutureTx[T] =  tryFutTx flatMap {
+      case Success(f) => FutureTx.lazyUnit(f)
+      case Failure(e) => FutureTx.failed(e)
+    }
+  }
+
   def recoverImpl[T, U >: T](fTx: FutureTx[T],
                              pf: PartialFunction[Throwable, U])(implicit ec: ExecutionContext): FutureTx[U] = context => {
     fTx(context).recover(pf)
