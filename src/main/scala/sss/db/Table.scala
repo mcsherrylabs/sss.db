@@ -38,12 +38,14 @@ class Table private[db] (name: String,
   @throws[DbOptimisticLockingException]("if the row has been updated after you read it")
   def update(values: Map[String, Any], where: Where, updateVersionCol: Boolean = false): FutureTx[Int] = {
 
-    val params = values.keys.map(k => s"$k = ?").mkString(",")
+    val (keys, vals) = values.splitKeyValues
+
+    val params = keys.map(k => s"$k = ?").mkString(",")
 
     val versionSql = if (updateVersionCol) ", version = version + 1" else ""
     val sql = s"UPDATE $name SET $params $versionSql ${where.sql}"
 
-    prepareStatement(sql, values.values.toSeq ++ where.params).map { ps =>
+    prepareStatement(sql, vals ++ where.params).map { ps =>
 
       try {
         val numRows = ps.executeUpdate()
@@ -94,11 +96,12 @@ class Table private[db] (name: String,
     */
   def insert(values: Map[String, Any]): FutureTx[Row] = {
 
-    val names = values.keys.mkString(",")
-    val params = (0 until values.keys.size).map(x => "?").mkString(",")
+    val (keys, vals) = values.splitKeyValues
+    val names = keys.mkString(",")
+    val params = keys.indices.map(x => "?").mkString(",")
 
     val sql = s"INSERT INTO ${name} (${names}) VALUES ( ${params})"
-    prepareStatement(sql, values.values.toSeq, Some(Statement.RETURN_GENERATED_KEYS)).flatMap { ps =>
+    prepareStatement(sql, vals, Some(Statement.RETURN_GENERATED_KEYS)).flatMap { ps =>
       try {
         ps.executeUpdate() // run the query
         val ks = ps.getGeneratedKeys
@@ -195,11 +198,12 @@ class Table private[db] (name: String,
     */
   def insertNoIdentity(values: Map[String, Any]): FutureTx[Int] = {
 
-    val names = values.keys.mkString(",")
-    val params = (0 until values.keys.size).map(x => "?").mkString(",")
+    val (keys, vals) = values.splitKeyValues
+    val names = keys.mkString(",")
+    val params = keys.indices.map(x => "?").mkString(",")
 
     val sql = s"INSERT INTO ${name} (${names}) VALUES ( ${params})"
-    prepareStatement(sql, values.values.toSeq).map { ps =>
+    prepareStatement(sql, vals).map { ps =>
       try {
         ps.executeUpdate() // run the query
       } finally {

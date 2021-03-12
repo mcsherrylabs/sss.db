@@ -404,4 +404,14 @@ class DbV2Spec extends DbSpecSetup {
     assert(rows.size === 2)
     assert(rows.forall(r => Seq(TestEnum.Test1.id, TestEnum.Test2.id).contains(r[Int]("intVal"))))
   }
+
+  it should "correctly update a multi column row" in {
+    val db = fixture.dbUnderTest
+    import db.syncRunContext
+    val table = fixture.dbUnderTest.table("testMultiColumn")
+    val updates = Map("cola" -> 1, "colb" -> "", "colc" -> 3, "cold" -> "", "cole" -> true)
+    table.insert(updates).runSyncAndGet
+    //This will
+    assert(table.update(updates, where("cola" -> 1)).runSync.isSuccess, "Will fail if col types and column names get into wrong order ")
+  }
 }

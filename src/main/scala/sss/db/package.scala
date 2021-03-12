@@ -148,6 +148,12 @@ package object db extends Logging {
 
   implicit def toMap(r: Row): Map[String, _] = r.asMap
 
+  implicit class MapHelper[A](val m: Map[String, A]) extends AnyVal {
+    def splitKeyValues: (Seq[String], Seq[A]) = m.foldLeft((Seq.empty[String], Seq.empty[A])) {
+      case ((keys, vals), (k, v)) => (keys :+ k, vals :+ v)
+    }
+  }
+
   sealed case class LimitParams(page: Int, start: Option[Long] = None)
 
   type Limit = Option[LimitParams]

@@ -98,10 +98,10 @@ class Query private[db] (private val selectSql: String,
   }
 
   private def tuplesToWhere(lookup: (String, Any)*): Where = {
-    val asMap = lookup.toMap
-    val sqls = asMap.keys.map { k => s"$k = ?" }
+    val (keys, values) = lookup.toMap.splitKeyValues
+    val sqls = keys.map { k => s"$k = ?" }
     val sql = sqls.mkString(" AND ")
-    new Where(sql, asMap.values.toSeq)
+    new Where(sql, values)
   }
 
   /**
