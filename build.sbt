@@ -14,6 +14,7 @@ resolvers += "stepsoft" at "https://nexus.mcsherrylabs.com/repository/releases/"
 
 resolvers += "stepsoft-snapshots" at "https://nexus.mcsherrylabs.com/repository/snapshots/"
 
+organization := "com.mcsherrylabs"
 
 publishTo := {
   val nexus = "https://nexus.mcsherrylabs.com/"
