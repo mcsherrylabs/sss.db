@@ -2,24 +2,33 @@ package sss.db
 
 
 import com.typesafe.config.Config
-import sss.ancillary.{DynConfig, Logging}
+import sss.ancillary.{DynConfig, Logging, LoggingFutureSupport}
+import sss.db.TxIsolationLevel.TxIsolationLevel
 import sss.db.datasource.DataSource
 import sss.db.datasource.DataSource._
 
-import scala.language.dynamics
+import scala.concurrent.ExecutionContext
+import scala.concurrent.duration.DurationInt
+import scala.util.Try
+
+
 
 object Db {
 
-  def apply(dbConfig: DbConfig)(ds:CloseableDataSource) = {
-    new Db(dbConfig)(ds)
+  def apply(dbConfig: DbConfig)(ds:CloseableDataSource,
+                                executionContext: ExecutionContext): Db = {
+    new Db(dbConfig)(ds, executionContext)
   }
 
-  def apply(dbConfig: Config)(ds:CloseableDataSource): Db = {
-    apply(DynConfig[DbConfig](dbConfig))(ds)
+  def apply(dbConfig: Config)(ds:CloseableDataSource,
+                              executionContext: ExecutionContext): Db = {
+    apply(DynConfig[DbConfig](dbConfig))(ds, executionContext)
   }
 
-  def apply(dbConfigName: String = "database", ds:CloseableDataSource = DataSource()): Db = {
-    apply(DynConfig[DbConfig](dbConfigName))(ds)
+  def apply(dbConfigName: String = "database",
+            ds:CloseableDataSource = DataSource(),
+            executionContext: ExecutionContext = ExecutionContextHelper.ioExecutionContext): Db = {
+    apply(DynConfig[DbConfig](dbConfigName))(ds, executionContext)
   }
 }
 
@@ -31,15 +40,21 @@ trait DbConfig {
   val createSqlOpt: Option[java.lang.Iterable[String]]
 }
 
-class Db(dbConfig: DbConfig)(private[db] val ds:CloseableDataSource) extends Logging with Dynamic with Tx {
+class Db(dbConfig: DbConfig)(closeableDataSource:CloseableDataSource, ec: ExecutionContext)
+  extends Logging
+    with LoggingFutureSupport{
+
 
   if(dbConfig.useShutdownHook) sys addShutdownHook shutdown
 
-  DbInitialSqlExecutor(dbConfig: DbConfig, executeSql _)
+  val defaultSyncContextTransactionTimeout = 3.seconds
 
-  def selectDynamic(tableName: String) = table(tableName)
+  implicit val syncRunContext: SyncRunContext = new SyncRunContext(closeableDataSource, defaultSyncContextTransactionTimeout)
+  implicit val asyncRunContext: AsyncRunContext = new AsyncRunContext(closeableDataSource, ec)
 
-  def table(name: String): Table =  new Table(name, ds, dbConfig.freeBlobsEarly)
+  DbInitialSqlExecutor(dbConfig: DbConfig, executeSql)(syncRunContext)
+
+  def table(name: String): Table =  new Table(name, syncRunContext, dbConfig.freeBlobsEarly)
 
   /*
   Views - they're great!
@@ -53,17 +68,17 @@ class Db(dbConfig: DbConfig)(private[db] val ds:CloseableDataSource) extends Log
 
   TL;DR for blockchain type applications views are a good solution.
    */
-  def view(name: String): View = new View(name, ds, dbConfig.freeBlobsEarly)
+  def view(name: String): View = new View(name, syncRunContext, dbConfig.freeBlobsEarly)
 
-  def dropView(viewName: String) = executeSql(s"DROP VIEW ${viewName}")
+  def dropView(viewName: String): FutureTx[Int] = executeSql(s"DROP VIEW ${viewName}")
 
-  def createView(createViewSql: String) = executeSql(createViewSql)
+  def createView(createViewSql: String): FutureTx[Int] = executeSql(createViewSql)
 
-  def select(sql: String): Query = new Query(sql, ds, dbConfig.freeBlobsEarly)
+  def select(sql: String): Query = new Query(sql, syncRunContext, dbConfig.freeBlobsEarly)
 
-  def shutdown = {
-    executeSql("SHUTDOWN")
-    ds.close
+
+  def shutdown: FutureTx[Int] = {
+    executeSql("SHUTDOWN") //.map{case x  => Try(closeableDataSource.close()); x}
   }
 
   /**
@@ -73,20 +88,27 @@ class Db(dbConfig: DbConfig)(private[db] val ds:CloseableDataSource) extends Log
     * @return
     * @note This is a gateway for sql injection attacks, use with extreme caution.
     */
-  def executeSqls(sqls: Seq[String]): Seq[Int] = inTransaction(sqls.map(executeSql))
+  def executeSqls(sqls: Seq[String]): FutureTx[Seq[Int]] = {
+    sqls.foldLeft(FutureTx.unit(Seq.empty[Int])) {
+      (acc,e) => acc.flatMap(seqInt => executeSql(e).map(i => seqInt :+ i))
+    }
+  }
 
   /**
     * Execute any sql you give it on a db connection in a transaction
     * .
+    *
     * @param sql - sql to execute
     * @return
     * @note This is a gateway for sql injection attacks, use with extreme caution.
     */
-  def executeSql(sql: String):Int = inTransaction {
-    val st = conn.createStatement()
-    try {
-      st.executeUpdate(sql)
-    } finally st.close
+  def executeSql(sql: String): FutureTx[Int] = { context =>
+    LoggingFuture {
+      val st = context.conn.createStatement()
+      try {
+        st.executeUpdate(sql)
+      } finally st.close()
+    }(context.ec)
   }
 
 

@@ -1,24 +1,29 @@
 package sss
 
+import sss.ancillary.FutureOps.AwaitReady
+import sss.ancillary.Logging
+import sss.db.IsNull.IsNull
+
 import java.io.{ByteArrayInputStream, InputStream}
 import java.math.BigDecimal
-import java.sql.Blob
+import java.sql.{Blob, Connection}
+import java.util.regex.Pattern
+import javax.sql.DataSource
+import sss.db.NullOrder.NullOrder
+import sss.db.TxIsolationLevel.TxIsolationLevel
+
 import java.util
 import java.util.Locale
-import java.util.regex.Pattern
-
-import sss.db.IsNull.IsNull
-import sss.db.NullOrder.NullOrder
-
-import scala.collection.immutable.ArraySeq
 import scala.collection.mutable
-import scala.collection.mutable.WrappedArray
+import scala.concurrent.duration.Duration
+import scala.concurrent.{ExecutionContext, Future}
 import scala.language.implicitConversions
+import scala.util.{Failure, Success, Try}
 
 /**
   * @author alan
   */
-package object db {
+package object db extends Logging {
 
   object DbException {
     def apply(msg: String) = throw new DbException(msg)
@@ -39,7 +44,7 @@ package object db {
 
 
   type SimpleColumnTypes =
-    String with
+      String with
       Long with
       Short with
       Integer with
@@ -49,7 +54,7 @@ package object db {
       BigDecimal with
       Byte with
       Double with
-      ArraySeq[Byte] with
+      mutable.ArraySeq[Byte] with
       Array[Byte] with
       java.sql.Date with
       java.sql.Time with
@@ -64,6 +69,77 @@ package object db {
   type ColumnTypes = SimpleColumnTypes with Option[SimpleColumnTypes]
 
 
+  object TxIsolationLevel extends Enumeration {
+    type TxIsolationLevel = Value
+    val NONE = Value(Connection.TRANSACTION_NONE)
+    val READ_COMMITTED = Value(Connection.TRANSACTION_READ_COMMITTED)
+    val READ_UNCOMMITTED = Value(Connection.TRANSACTION_READ_UNCOMMITTED)
+    val REPEATABLE_READ = Value(Connection.TRANSACTION_REPEATABLE_READ)
+    val SERIALIZABLE = Value(Connection.TRANSACTION_SERIALIZABLE)
+  }
+
+  trait RunContext {
+    implicit val ds: DataSource
+    implicit val executor: FutureTxExecutor
+    val isolationLevel: Option[TxIsolationLevel]
+  }
+
+  class AsyncRunContext(aDs: DataSource,
+                   anEc: ExecutionContext,
+                   val isolationLevel: Option[TxIsolationLevel] = None,
+                   anExecutor: FutureTxExecutor = FutureTxExecutor
+                  ) extends RunContext {
+    implicit val ds: DataSource = aDs
+    implicit val ec: ExecutionContext = anEc
+    implicit val executor: FutureTxExecutor = anExecutor
+  }
+
+  class SyncRunContext(aDs: DataSource,
+                       val timeout: Duration,
+                       val isolationLevel: Option[TxIsolationLevel] = None,
+                       anExecutor: FutureTxExecutor = FutureTxExecutor
+                      ) extends RunContext {
+    implicit val ds: DataSource = aDs
+    implicit val executor: FutureTxExecutor = anExecutor
+
+  }
+
+  implicit class RunOp[T](val t: FutureTx[T]) extends AnyVal {
+    def run(implicit runContext: AsyncRunContext): Future[T] = {
+      runContext.executor.execute(t, runContext, false)
+    }
+
+    def runRollback(implicit runContext: AsyncRunContext): Future[T] = {
+      runContext.executor.execute(t, runContext, true)
+    }
+  }
+
+  implicit class RunSyncOp[T](val t: FutureTx[T]) extends AnyVal {
+
+    def runSync(implicit runContext: SyncRunContext): Try[T] = {
+      runContext.executor.executeSync(
+        t,
+        runContext.ds,
+        false,
+        runContext.isolationLevel,
+        runContext.timeout
+      )
+    }
+
+    def runSyncRollback(implicit runContext: SyncRunContext): Try[T] = {
+      runContext.executor.executeSync(
+        t,
+        runContext.ds,
+        true,
+        runContext.isolationLevel,
+        runContext.timeout
+      )
+    }
+
+    def runSyncAndGet(implicit runContext: SyncRunContext): T = runSync.get
+    def runSyncRollbackAndGet(implicit runContext: SyncRunContext): T = runSyncRollback.get
+  }
+
   implicit class SqlHelper(val sc: StringContext) extends AnyVal {
     def ps(args: Any*): (String, Seq[Any]) = {
       (sc.parts.mkString("?"), args)
@@ -71,6 +147,12 @@ package object db {
   }
 
   implicit def toMap(r: Row): Map[String, _] = r.asMap
+
+  implicit class MapHelper[A](val m: Map[String, A]) extends AnyVal {
+    def splitKeyValues: (Seq[String], Seq[A]) = m.foldLeft((Seq.empty[String], Seq.empty[A])) {
+      case ((keys, vals), (k, v)) => (keys :+ k, vals :+ v)
+    }
+  }
 
   sealed case class LimitParams(page: Int, start: Option[Long] = None)
 
@@ -112,8 +194,8 @@ package object db {
 
     private[db] def sql: String = {
       orderByClausesToString(orderBys) + (limit match {
-        case Some(LimitParams(limit, Some(start))) => s" LIMIT $start, $limit"
-        case Some(LimitParams(limit, None)) => s" LIMIT $limit"
+        case Some(LimitParams(lim, Some(start))) => s" LIMIT $start, $lim"
+        case Some(LimitParams(lim, None)) => s" LIMIT $lim"
         case None => ""
       })
     }
@@ -157,8 +239,8 @@ package object db {
     }
 
     def in(params: Set[_], neg: Boolean = false): Where = {
-      val str = Seq.fill(params.size)("?") mkString (",")
-      val isNot = if (neg) " NOT" else ""
+      val str = Seq.fill(params.size)("?") mkString(",")
+      val isNot = if(neg) " NOT" else ""
       val newClause = s"$clause$isNot IN ($str)"
       copy(newClause, this.params ++ params)
     }
@@ -178,12 +260,15 @@ package object db {
     def limit(page: Int): Where = copy(orderBys = orderBys.limit(page))
 
     private[db] def sql: String = {
-      val where = if (!clause.isEmpty) s" WHERE $clause" else ""
+      val where = if (clause.nonEmpty) s" WHERE $clause" else ""
       where + orderBys.sql
     }
   }
 
-  implicit def toWhere(orderBy: OrderBy): Where = new Where("", Seq.empty, OrderBys(orderBy))
+  object WhereOps {
+    implicit def toWhere(orderBy: OrderBy): Where = new Where("", Seq.empty, OrderBys(orderBy))
+  }
+
 
   def where(): Where = new Where("")
 
@@ -261,10 +346,10 @@ package object db {
         None
       } else if (typeOf[T] == typeOf[Array[Byte]] && rawVal.isInstanceOf[Blob]) {
         blobToBytes(rawVal.asInstanceOf[Blob])
-      } else if (typeOf[T] == typeOf[ArraySeq[Byte]] && rawVal.isInstanceOf[Blob]) {
+      } else if (typeOf[T] == typeOf[mutable.ArraySeq[Byte]] && rawVal.isInstanceOf[Blob]) {
         blobToWrappedBytes(rawVal.asInstanceOf[Blob])
-      } else if (typeOf[T] == typeOf[ArraySeq[Byte]] && rawVal.isInstanceOf[Array[Byte]]) {
-        (rawVal.asInstanceOf[Array[Byte]]).to(ArraySeq)
+      } else if (typeOf[T] == typeOf[mutable.ArraySeq[Byte]] && rawVal.isInstanceOf[Array[Byte]]) {
+        (rawVal.asInstanceOf[Array[Byte]]).to(mutable.ArraySeq)
       } else if (typeOf[T] == typeOf[InputStream] && rawVal.isInstanceOf[Blob]) {
         blobToStream(rawVal.asInstanceOf[Blob])
       } else if (typeOf[T] == typeOf[Byte] && rawVal.isInstanceOf[Array[Byte]]) {
@@ -344,12 +429,11 @@ package object db {
 
     private def blobToBytes(jDBCBlobClient: Blob): Array[Byte] = jDBCBlobClient.getBytes(1, jDBCBlobClient.length.toInt)
 
-    private def blobToWrappedBytes(jDBCBlobClient: Blob): ArraySeq[Byte] = jDBCBlobClient.getBytes(1, jDBCBlobClient.length.toInt).to(ArraySeq)
+    private def blobToWrappedBytes(jDBCBlobClient: Blob): mutable.ArraySeq[Byte] = jDBCBlobClient.getBytes(1, jDBCBlobClient.length.toInt).to(mutable.ArraySeq)
 
     override def toString: String = {
-      asMap.foldLeft("") { case (a, (k, v)) => a + s" Key:${k}, Value: ${v}" }
+      asMap.foldLeft("") { case (a, (k, v)) => a + s" Key:$k, Value: $v" }
     }
   }
-
 
 }

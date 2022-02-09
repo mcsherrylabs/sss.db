@@ -12,6 +12,7 @@ trait DbSpecSetupBase extends Matchers with BeforeAndAfter {
   case class TestFixture(dbUnderTest: Db, table: Table)
 
   val dbConfigName = "testDb"
+
   var fixture: TestFixture = _
 
   val idCol = "id"
@@ -26,11 +27,13 @@ trait DbSpecSetupBase extends Matchers with BeforeAndAfter {
   }
 
   after {
-    fixture.dbUnderTest.shutdown
+    val db = fixture.dbUnderTest
+    import db.syncRunContext
+    import db.syncRunContext.executor
+    fixture.dbUnderTest.shutdown.runSyncAndGet
   }
 
 }
 
 trait DbSpecSetup extends AnyFlatSpec with DbSpecSetupBase
 trait AsyncDbSpecSetup extends AsyncFlatSpec with DbSpecSetupBase
-

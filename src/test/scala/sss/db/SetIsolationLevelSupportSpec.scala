@@ -1,6 +1,6 @@
 package sss.db
 
-import java.sql.{Connection, SQLTransactionRollbackException}
+import java.sql.SQLTransactionRollbackException
 import java.util.Date
 
 import org.scalatest.DoNotDiscover
@@ -14,43 +14,47 @@ import scala.util.{Failure, Success, Try}
 @DoNotDiscover
 class SetIsolationLevelSupportSpec extends DbSpecSetup {
 
-  def parallelEffect(j: Int): Try[(Long, Long)] = {
-    Try {
-      fixture.table.tx(Connection.TRANSACTION_SERIALIZABLE, {
-        val tname = Thread.currentThread().getName
-        val c = fixture.table.count
-        val i = fixture.table.insert(j, s"strId $j", new Date().getTime, j)
-        assert(i === 1, "should only insert 1 row")
-        (c, fixture.table.count)
-      })
-      //println(s"$tname result is new=$nc inserted=$i old count=$c ")
-    } recoverWith {
-      case e: SQLTransactionRollbackException => {
-        //println(e)
-        parallelEffect(j)
-      }
-    }
+  def parallelEffect(j: Int): FutureTx[(Long,Long)] = {
+
+      for {
+        c <- fixture.table.count
+        i <- fixture.table.insert(j, s"strId $j", new Date().getTime, j)
+        _ = assert (i === 1, "should only insert 1 row")
+        nc <- fixture.table.count
+        //_ = println(s"${Thread.currentThread().getName} result is new=$nc inserted=$i old count=$c ")
+
+      } yield (c, nc)
+
   }
 
 
-  def futureParallelEffect(j: Int):Future[Try[(Long, Long)]] = Future (parallelEffect(j))
-
-
-
   it should "support TRANSACTION_SERIALIZABLE " in {
+
+    val db = fixture.dbUnderTest
+    implicit val cntxt = new AsyncRunContext(db.asyncRunContext.ds, db.asyncRunContext.ec, Some(TxIsolationLevel.SERIALIZABLE), db.asyncRunContext.executor)
+    import db.syncRunContext
+
     val testCount = 100
-    val effects = for {
-      i <- (0 until testCount)
-    } yield(futureParallelEffect(i))
+
+    def runIt(effect: FutureTx[(Long, Long)]): Future[(Long, Long)] = {
+      effect.run.recoverWith {
+        case e: SQLTransactionRollbackException => {
+          runIt(effect)
+        }
+      }
+    }
+
+    val effects = 0 until testCount map parallelEffect map runIt
+
 
     effects.foreach { effect =>
       Await.result(effect, 10 seconds) match {
-        case Failure(e) => fail("No idea? ")
-        case Success(c) => assert(c._1 + 1 === c._2, "Counts should be incremental")
+        case (c1, c2) => assert(c1 + 1 === c2, "Counts should be incremental")
       }
 
     }
-    assert(fixture.table.count === testCount, s"Should only be $testCount rows inserted")
+
+    assert(fixture.table.count.runSyncAndGet === testCount, s"Should only be $testCount rows inserted")
   }
 
 

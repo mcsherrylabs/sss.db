@@ -3,9 +3,9 @@ package sss.db
 import java.io._
 import java.nio.file.Files
 import java.util
-
 import org.scalatest.DoNotDiscover
 
+import java.nio.charset.StandardCharsets
 import scala.collection.immutable.ArraySeq
 import scala.collection.mutable
 import scala.util.Random
@@ -51,10 +51,13 @@ class BlobStoreSpec extends DbSpecSetup {
 
   it should "support writing File to BLOB" in {
 
+    val db = fixture.dbUnderTest
+    import db.syncRunContext
+    import db.syncRunContext.executor
     val start = System.currentTimeMillis()
 
     val numB = KB * 10
-    val table = fixture.dbUnderTest.testBinary
+    val table = fixture.dbUnderTest.table("testBinary")
     val fIn = createFile(numB)
     fIn.deleteOnExit()
 
@@ -62,12 +65,12 @@ class BlobStoreSpec extends DbSpecSetup {
     println(s"Setup/Create ${numB} KB file took ${startWrite-start} ms")
 
     val in = new FileInputStream(fIn)
-    val index = table.insert(Map("blobVal" -> in))
+    val index = table.insert(Map("blobVal" -> in)).runSyncAndGet
 
     val writeDone = System.currentTimeMillis()
     println(s"Write ${numB} KB file to db took ${writeDone - startWrite} ms")
 
-    val found = table.get(index.id)
+    val found = table.get(index.id).runSyncAndGet
     assert(found.isDefined)
     val is = found.get[InputStream]("blobVal")
 
@@ -100,101 +103,141 @@ class BlobStoreSpec extends DbSpecSetup {
       .foreach(_ => assert(util.Arrays.equals(bytes1, bytes2), "Read arrays did not match"))
 
     val compareDone = System.currentTimeMillis()
-    println(s"Compare 2 ${numB} KB files took ${compareDone-writeDone} ms")
+    println(s"Compare 2 ${numB} KB files took ${compareDone - writeDone} ms")
   }
 
   it should " support persisting a byte as Binary" in {
 
+    val db = fixture.dbUnderTest
+    import db.syncRunContext
+    import db.syncRunContext.executor
+    val table = db.table("testBinary")
+
     val testByte: Byte = 34
-    val table = fixture.dbUnderTest.testBinary
-    table.tx {
-      val m = table.persist(Map("byteVal" -> testByte))
-      assert(m[Byte]("byteVal") === testByte)
-      val empty = table.persist(Map("byteVal" -> None))
-      assert(Option(empty[Byte]("byteVal")).isEmpty)
-      assert(empty[Option[Byte]]("byteVal") === None)
-    }
+
+    (for {
+
+      m <- table.persist(Map("byteVal" -> testByte))
+      _ = assert(m[Byte]("byteVal") === testByte)
+      empty <- table.persist(Map("byteVal" -> None))
+      _ = assert(Option(empty[Byte]("byteVal")).isEmpty)
+      _ = assert(empty[Option[Byte]]("byteVal") === None)
+
+    } yield ()).runSyncAndGet
 
   }
 
   it should " support persisting binary arrays as a blob " in {
 
     val testStr = "Hello My Friend"
-    val table = fixture.dbUnderTest.testBinary
-    table.tx {
-      val m = table.persist(Map("blobVal" -> testStr.getBytes))
-      assert(m[Array[Byte]]("blobVal") === testStr.getBytes)
-      assert(new String(m[Array[Byte]]("blobVal")) === testStr)
-    }
 
+    val db = fixture.dbUnderTest
+    import db.syncRunContext
+    import db.syncRunContext.executor
+    val table = db.table("testBinary")
+
+    val plan = for {
+      m <- table.persist(Map("blobVal" -> testStr.getBytes))
+      _ = assert(m[Array[Byte]]("blobVal") === testStr.getBytes)
+      _ = assert(new String(m[Array[Byte]]("blobVal")) === testStr)
+    } yield()
+
+    plan.runSyncAndGet
   }
 
   it should "support persisting wrapped binary arrays as a blob" in {
 
+    val db = fixture.dbUnderTest
+    import db.syncRunContext
+    import db.syncRunContext.executor
+    val table = db.table("testBinary")
+
     val testStr = "Hello My Friend"
-    val table = fixture.dbUnderTest.testBinary
-    val wAry  = testStr.getBytes
-    table.tx {
-      val m = table.persist(Map("blobVal" -> wAry))
-      assert(m[ArraySeq[Byte]]("blobVal") === wAry)
-      assert(new String(m[ArraySeq[Byte]]("blobVal").toArray) === testStr)
-    }
+
+    val wAry : Array[Byte] = testStr.getBytes
+
+    val plan = for {
+      m <- table.persist(Map("blobVal" -> wAry))
+      _ = assert(m[Array[Byte]]("blobVal") === wAry)
+      _ = assert(new String(m[Array[Byte]]("blobVal").array) === testStr)
+    } yield ()
+
+    plan.runSyncAndGet
 
   }
+
   it should "support find along binary arrays" in {
 
+    val db = fixture.dbUnderTest
+    import db.syncRunContext
+    import db.syncRunContext.executor
+    val table = db.table("testBinary")
     val testStr = "Hello My Friend"
-    val table = fixture.dbUnderTest.testBinary
     val bytes = testStr.getBytes
-    table.persist(Map("blobVal" -> bytes))
 
-    table.tx {
-      val found = table.find(where("blobVal = ?", bytes))
-      assert(found.isDefined)
-      assert(found.get[Array[Byte]]("blobVal") === bytes)
+    val plan = for {
+      _ <- table.persist(Map("blobVal" -> bytes))
+      found <- table.find(where("blobVal = ?", bytes))
+      _ = assert(found.isDefined)
+      _ = assert(found.get[Array[Byte]]("blobVal") === bytes)
+      _ = assert(new String(found.get[mutable.ArraySeq[Byte]]("blobVal").toArray, StandardCharsets.UTF_8) === testStr)
+    } yield ()
 
-      assert(new String(found.get[ArraySeq[Byte]]("blobVal").toArray) === testStr)
-    }
+    plan.runSyncAndGet
 
   }
 
   it should " NOT support find along wrapped binary arrays (you must use .array)" in {
 
-    val testStr = "Hello My Friend"
-    val table = fixture.dbUnderTest.testBinary
-    val wAry = testStr.getBytes
-    val m = table.persist(Map("blobVal" -> wAry))
+    val db = fixture.dbUnderTest
+    import db.syncRunContext
+    import db.syncRunContext.executor
+    val table = db.table("testBinary")
 
-    table.tx {
-      val found = table.find(where("blobVal = ?", wAry.array))
-      assert(found.isDefined)
-      assert(found.get[ArraySeq[Byte]]("blobVal") === wAry)
-      assert(new String(found.get[ArraySeq[Byte]]("blobVal").toArray) === testStr)
-    }
+    val testStr = "Hello My Friend"
+
+    val wAry : Array[Byte] = testStr.getBytes
+
+    val plan = for {
+      m <- table.persist(Map("blobVal" -> wAry))
+      found <- table.find(where("blobVal = ?", wAry.array))
+      _ = assert(found.isDefined)
+      _ =  assert(found.get[Array[Byte]]("blobVal") === wAry)
+      _ = assert(new String(found.get[Array[Byte]]("blobVal").array) === testStr)
+    } yield ()
+
+    plan.runSyncAndGet
 
   }
 
   it should "support inputstream result" in {
 
+    val db = fixture.dbUnderTest
+    import db.syncRunContext.ds
+    import db.syncRunContext
+    val table = db.table("testBinary")
     val testStr = "Hello My Friend"
-    val table = fixture.dbUnderTest.testBinary
     val bytes = testStr.getBytes
-    table.persist(Map("blobVal" -> bytes))
 
-    table.tx {
-      val found = table.find(where("blobVal = ?", bytes))
-      assert(found.isDefined)
-      val is = found.get[InputStream]("blobVal")
-      val readBytes = new Array[Byte](bytes.length)
-      val dataIs = new DataInputStream(is)
-      dataIs.readFully(readBytes)
-      assert(readBytes === bytes)
-      assert(new String(readBytes) === testStr)
-    }
 
+    val plan = for {
+      _ <- table.persist(Map("blobVal" -> bytes))
+      found <- table.find(where("blobVal = ?", bytes))
+      _ = assert(found.isDefined)
+      is = found.get[InputStream]("blobVal")
+      readBytes = new Array[Byte](bytes.length)
+      dataIs = new DataInputStream(is)
+      _ = dataIs.readFully(readBytes)
+      _ = assert(readBytes === bytes)
+      _ = assert(new String(readBytes) === testStr)
+    } yield ()
+
+    plan.runSyncAndGet
   }
 
-  it should "support blob result" in {
+
+
+  /*it should "support blob result" in {
 
     val testStr = "Hello My Friend"
     val table = fixture.dbUnderTest.testBinary
@@ -209,6 +252,6 @@ class BlobStoreSpec extends DbSpecSetup {
 
     assert(readBytes === bytes)
     assert(new String(readBytes) === testStr)
-  }
+  }*/
 
 }

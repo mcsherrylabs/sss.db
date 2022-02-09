@@ -15,13 +15,18 @@ object HikariDataSource {
     val hikariConfig = new HikariConfig()
     hikariConfig.setDriverClassName(dsConfig.driver)
     val connPlusProps = {
-      if(!dsConfig.connectionProperties.startsWith(";") && dsConfig.connectionProperties.length > 0) {
+      if(!dsConfig.connectionProperties.startsWith(";") && dsConfig.connectionProperties.nonEmpty) {
         dsConfig.connection + ";" + dsConfig.connectionProperties
 
       } else dsConfig.connection + dsConfig.connectionProperties
     }
     hikariConfig.setJdbcUrl(connPlusProps)
 
+    dsConfig.allowPoolSuspensionOpt foreach hikariConfig.setAllowPoolSuspension
+    dsConfig.catalogOpt foreach hikariConfig.setCatalog
+    dsConfig.connectionInitSqlOpt foreach hikariConfig.setConnectionInitSql
+
+    hikariConfig.setConnectionTimeout(dsConfig.connectionTimeout)
     hikariConfig.setUsername(dsConfig.user)
     hikariConfig.setPassword(dsConfig.pass)
     hikariConfig.setAutoCommit(false)
@@ -29,8 +34,8 @@ object HikariDataSource {
     hikariConfig.setTransactionIsolation(dsConfig.transactionIsolationLevel)
 
     hikariConfig.setMaximumPoolSize(dsConfig.maxPoolSize)
-    dsConfig.testQueryOpt map (hikariConfig.setConnectionTestQuery(_))
-    hikariConfig.setPoolName("hikariCP")
+    dsConfig.testQueryOpt foreach hikariConfig.setConnectionTestQuery
+    hikariConfig.setPoolName(dsConfig.poolName)
 
 
     hikariConfig.addDataSourceProperty("dataSource.cachePrepStmts", dsConfig.cachePrepStmts)
