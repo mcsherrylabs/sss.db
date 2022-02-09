@@ -1,13 +1,13 @@
 
 name := "sss-db"
 
-version := "0.9.50"
+version := "0.9.51"
 
-scalaVersion := "2.13.4"
+scalaVersion := "2.13.8"
 
 updateOptions := updateOptions.value.withGigahorse(false)
 
-parallelExecution in Test := false
+Test / parallelExecution := false
 
 //needed to retrieve ancillary, publish happens via global.sbt.
 resolvers += "stepsoft" at "https://nexus.mcsherrylabs.com/repository/releases/"
@@ -41,16 +41,16 @@ dependencyOverrides += "org.scala-lang" % "scala-compiler" % scalaVersion.value
 // https://mvnrepository.com/artifact/org.scalatest/scalatest
 libraryDependencies += "org.scalatest" %% "scalatest" % "3.2.2" % Test
 
-libraryDependencies += "org.hsqldb" % "hsqldb" % "2.5.1" % Test
+libraryDependencies += "org.hsqldb" % "hsqldb" % "2.6.1" % Test
 
 val excludeJetty = ExclusionRule(organization = "org.eclipse.jetty.aggregate")
 
 libraryDependencies += "com.mcsherrylabs" %% "sss-ancillary" % "1.18" excludeAll(excludeJetty)
 
-libraryDependencies += "org.apache.commons" % "commons-dbcp2" % "2.8.0"
+libraryDependencies += "org.apache.commons" % "commons-dbcp2" % "2.9.0"
 
-libraryDependencies += "org.apache.commons" % "commons-pool2" % "2.9.0"
+libraryDependencies += "org.apache.commons" % "commons-pool2" % "2.11.1"
 
-libraryDependencies += "com.zaxxer" % "HikariCP" % "3.4.5"
+libraryDependencies += "com.zaxxer" % "HikariCP" % "5.0.1"
 
 

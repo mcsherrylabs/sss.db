@@ -28,5 +28,10 @@ trait DataSourceConfig {
   val user: String
   val pass: String
   val transactionIsolationLevel: String
+  val connectionTimeout: Int
+  val allowPoolSuspensionOpt: Option[Boolean]
+  val poolName: String
+  val connectionInitSqlOpt: Option[String]
+  val catalogOpt: Option[String]
 }
 
