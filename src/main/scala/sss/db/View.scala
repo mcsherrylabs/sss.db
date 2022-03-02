@@ -20,7 +20,7 @@ class View private[db] (val name: String,
                         runContext: RunContext,
                         freeBlobsEarly: Boolean,
                         columns: String = "*")
-  extends Query(s"SELECT ${columns} from ${name}", runContext, freeBlobsEarly)  with Logging {
+  extends Query(s"SELECT ${columns} from ${name}", where(), runContext, freeBlobsEarly)  with Logging {
 
 
   def maxId(): FutureTx[Long] = max(id)

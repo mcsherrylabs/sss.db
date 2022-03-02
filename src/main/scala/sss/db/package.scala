@@ -228,7 +228,15 @@ package object db extends Logging {
     def and(w: Where): Where = {
       val newClause = if (clause.nonEmpty && w.clause.nonEmpty) clause + " AND " + w.clause
       else clause + w.clause
-      copy(clause = newClause, params = params ++ w.params)
+      val newLimit = w.orderBys.limit.orElse(orderBys.limit)
+      copy(
+        clause = newClause,
+        params = params ++ w.params,
+        orderBys = orderBys.copy(
+          orderBys = orderBys.orderBys ++ w.orderBys.orderBys,
+          limit = newLimit
+        )
+      )
     }
 
     def notIn(params: Set[_]): Where = in(params, true)

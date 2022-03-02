@@ -3,13 +3,11 @@ package sss.db
 
 import com.typesafe.config.Config
 import sss.ancillary.{DynConfig, Logging, LoggingFutureSupport}
-import sss.db.TxIsolationLevel.TxIsolationLevel
 import sss.db.datasource.DataSource
 import sss.db.datasource.DataSource._
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.DurationInt
-import scala.util.Try
 
 
 
@@ -74,8 +72,9 @@ class Db(dbConfig: DbConfig)(closeableDataSource:CloseableDataSource, ec: Execut
 
   def createView(createViewSql: String): FutureTx[Int] = executeSql(createViewSql)
 
-  def select(sql: String): Query = new Query(sql, syncRunContext, dbConfig.freeBlobsEarly)
+  def select(sql: String): Query = selectWhere(sql, where())
 
+  def selectWhere(selectSql: String, where: Where) = new Query(selectSql, where, syncRunContext, dbConfig.freeBlobsEarly)
 
   def shutdown: FutureTx[Int] = {
     executeSql("SHUTDOWN") //.map{case x  => Try(closeableDataSource.close()); x}

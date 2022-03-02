@@ -32,6 +32,7 @@ import scala.collection.{mutable, WithFilter}
   */
 
 class Query private[db] (private val selectSql: String,
+                         private val baseWhere: Where,
                          implicit val runContext: RunContext,
             freeBlobsEarly: Boolean)
   extends Logging
@@ -146,13 +147,13 @@ class Query private[db] (private val selectSql: String,
     * @param where
     * @return
     */
-  def filter(where: Where): FutureTx[Rows] = {
-
+  def filter(andWhere: Where): FutureTx[Rows] = {
+    val where = baseWhere.and(andWhere)
     prepareStatement(s"${selectSql} ${where.sql}", where.params) map { ps =>
       try {
         val rs = ps.executeQuery
         Rows(rs, freeBlobsEarly)
-      } finally ps.close
+      } finally ps.close()
     }
   }
 
@@ -190,21 +191,13 @@ class Query private[db] (private val selectSql: String,
 
   def get(id: Long): FutureTx[Option[Row]] = getRow(id)
 
-  def page(start: Long, pageSize: Int, orderClauses: Seq[OrderBy] = Seq(OrderAsc("id"))): FutureTx[Rows] = { context =>
-    LoggingFuture {
-      val st = context.conn.createStatement()
-      try {
-        val clause = where() orderBy (orderClauses: _*) limit(start, pageSize)
-        val rs = st.executeQuery(s"${selectSql} ${clause.sql}")
-        Rows(rs, freeBlobsEarly)
-      } finally st.close()
-    }(context.ec)
-  }
+  def page(start: Long, pageSize: Int, orderClauses: Seq[OrderBy] = Seq(OrderAsc("id"))): FutureTx[Rows] =
+    filter(where() orderBy (orderClauses: _*) limit(start, pageSize))
 
   def toPaged(pageSize: Int,
               filter: Where = where(),
-              indexCol: String = "id") =
-    PagedView(this, pageSize, filter, indexCol)
+              indexCol: String = "id"): PagedView =
+    PagedView(this, pageSize, this.baseWhere.and(filter), indexCol)
 
 
 }
