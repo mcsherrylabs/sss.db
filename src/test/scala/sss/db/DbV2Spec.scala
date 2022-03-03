@@ -14,8 +14,6 @@ class DbV2Spec extends DbSpecSetup {
     val db = fixture.dbUnderTest
 
     import db.syncRunContext
-    val table = db.table("test")
-
 
     val r1 = fixture.table.persist(Map("strId" -> "strId", "createTime" -> time, "intVal" -> 67)).runSync.get
     val r2 = fixture.table.persist(Map("id" -> r1("id"), "strId" -> "strId", "createTime" -> time, "intVal" -> 68)).runSyncAndGet
@@ -55,8 +53,7 @@ class DbV2Spec extends DbSpecSetup {
     val db = fixture.dbUnderTest
     import db.syncRunContext
 
-    val time = new Date()
-    val r1 = fixture.table.persist(Map(("strId" -> "strId"), ("createTime" -> time), ("intVal" -> 45))).runSyncAndGet
+    val r1 = persistIntVal(45).runSyncAndGet
     val r2 = fixture.table.find(where(ps"id = ${r1("id")}")).runSyncAndGet
     assert(r1 == r2.get)
 
@@ -82,8 +79,7 @@ class DbV2Spec extends DbSpecSetup {
     val db = fixture.dbUnderTest
     import db.syncRunContext
 
-    val time = new Date()
-    val r1 = fixture.table.persist(Map(("strId" -> "strId"), ("createTime" -> time), ("intVal" -> 45))).runSyncAndGet
+    val r1 = persistIntVal(45).runSyncAndGet
 
     val r2 = fixture.table.find(where("id = ?", r1("id"))).runSyncAndGet
     assert(r1 == r2.get)
@@ -93,12 +89,7 @@ class DbV2Spec extends DbSpecSetup {
     val db = fixture.dbUnderTest
     import db.syncRunContext
 
-    val time = new Date()
-
-    FutureTx.sequence((0 to 10) map { i =>
-      fixture.table.persist(Map(("strId" -> "strId"), ("createTime" -> time), ("intVal" -> 45)))
-    }).runSyncAndGet
-
+    persistIntVals(0 to 10).runSync
     assert(11 == fixture.table.count.runSyncAndGet)
 
   }
@@ -138,8 +129,7 @@ class DbV2Spec extends DbSpecSetup {
     val db = fixture.dbUnderTest
     import db.syncRunContext
 
-    val time = new Date()
-    val r1 = fixture.table.persist(Map("strId" -> "strId", "createTime" -> time, "intVal" -> 45)).runSyncAndGet
+    var r1 = persistIntVal(45).runSyncAndGet
     val r2 = fixture.table.find(where("id = ?", r1("id"))).runSyncAndGet
     assert(r1 == r2.get)
     val deletedRowCount = fixture.table.delete(where(ps"id = ${r1("id")}")).runSyncAndGet
@@ -153,9 +143,7 @@ class DbV2Spec extends DbSpecSetup {
 
     import db.syncRunContext
 
-    val time = new Date()
-    val r1 = fixture.table.persist(Map("strId" -> "strId", "createTime" -> time, "intVal" -> 45)).runSyncAndGet
-    val r3 = fixture.table.persist(Map("strId" -> "strId2", "createTime" -> time, "intVal" -> 45)).runSyncAndGet
+    persistIntVals(Seq(45, 45)).runSync
 
     val rowFilter = where("id > ?", 0)
 
@@ -175,11 +163,7 @@ class DbV2Spec extends DbSpecSetup {
     val db = fixture.dbUnderTest
     import db.syncRunContext
 
-
-    val time = new Date()
-    FutureTx.sequence((0 to 100) map { i =>
-      fixture.table.persist(Map(("strId" -> "strId"), ("createTime" -> time), ("intVal" -> i)))
-    }).runSyncAndGet
+    persistIntVals(0 to 100).runSync
 
     for (i <- 0 to 10) {
       val page = fixture.table.page(i * 10, 10).runSyncAndGet
@@ -197,11 +181,7 @@ class DbV2Spec extends DbSpecSetup {
     val db = fixture.dbUnderTest
 
     import db.syncRunContext
-    val time = new Date()
-
-    FutureTx.sequence((0 to 100) map { i =>
-      fixture.table.persist(Map(("strId" -> "strId"), ("createTime" -> time), ("intVal" -> i)))
-    }).runSyncAndGet
+    persistIntVals(0 to 100).runSync
 
     for (i <- 10 to 0) {
       val page = fixture.table.page(i * 10, 10, Seq(OrderDesc("intVal"))).runSyncAndGet
@@ -214,31 +194,6 @@ class DbV2Spec extends DbSpecSetup {
     val page = fixture.table.page(1000, 1).runSyncAndGet
     assert(page.isEmpty)
   }
-  it should "support views" in {
-
-    val db = fixture.dbUnderTest
-    import db.syncRunContext
-
-
-    val time = new Date()
-
-    try {
-
-      (for {
-        _ <- fixture.dbUnderTest.createView("CREATE VIEW testview2 AS SELECT strId, intVal FROM test WHERE intVal > 50")
-        _ <- FutureTx.sequence((0 to 100) map { i =>
-          fixture.table.persist(Map("strId" -> "strId", "createTime" -> time, "intVal" -> i))
-        })
-      } yield ()).runSyncAndGet
-
-
-      val view = fixture.dbUnderTest.view("testview2")
-      assert(view.count.runSyncAndGet == 50)
-      val empty = view.filter(where("intVal < 50")).runSyncAndGet
-      assert(empty.isEmpty)
-
-    } finally fixture.dbUnderTest.dropView("testview2").runSyncAndGet
-  }
 
   it should " support optimistic locking using the version field " in {
 
@@ -246,10 +201,7 @@ class DbV2Spec extends DbSpecSetup {
 
     import db.syncRunContext
 
-    val time = new Date()
-
     val table = fixture.dbUnderTest.table("testVersion")
-
 
     val (version1, version2) = (for {
       m <- table.persist(Map("version" -> 0, "strId" -> "Hello there world"))

@@ -1,24 +1,22 @@
 package sss
 
-import sss.ancillary.FutureOps.AwaitReady
 import sss.ancillary.Logging
 import sss.db.IsNull.IsNull
+import sss.db.NullOrder.NullOrder
+import sss.db.TxIsolationLevel.TxIsolationLevel
 
 import java.io.{ByteArrayInputStream, InputStream}
 import java.math.BigDecimal
 import java.sql.{Blob, Connection}
-import java.util.regex.Pattern
-import javax.sql.DataSource
-import sss.db.NullOrder.NullOrder
-import sss.db.TxIsolationLevel.TxIsolationLevel
-
 import java.util
 import java.util.Locale
+import java.util.regex.Pattern
+import javax.sql.DataSource
 import scala.collection.mutable
 import scala.concurrent.duration.Duration
 import scala.concurrent.{ExecutionContext, Future}
 import scala.language.implicitConversions
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 
 /**
   * @author alan
@@ -228,7 +226,15 @@ package object db extends Logging {
     def and(w: Where): Where = {
       val newClause = if (clause.nonEmpty && w.clause.nonEmpty) clause + " AND " + w.clause
       else clause + w.clause
-      copy(clause = newClause, params = params ++ w.params)
+      val newLimit = w.orderBys.limit.orElse(orderBys.limit)
+      copy(
+        clause = newClause,
+        params = params ++ w.params,
+        orderBys = orderBys.copy(
+          orderBys = orderBys.orderBys ++ w.orderBys.orderBys,
+          limit = newLimit
+        )
+      )
     }
 
     def notIn(params: Set[_]): Where = in(params, true)

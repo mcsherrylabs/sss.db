@@ -1,13 +1,11 @@
 
 name := "sss-db"
 
-version := "0.9.51"
+version := "0.9.52"
 
 scalaVersion := "2.13.8"
 
 updateOptions := updateOptions.value.withGigahorse(false)
-
-Test / parallelExecution := false
 
 //needed to retrieve ancillary, publish happens via global.sbt.
 resolvers += "stepsoft" at "https://nexus.mcsherrylabs.com/repository/releases/"
@@ -45,7 +43,7 @@ libraryDependencies += "org.hsqldb" % "hsqldb" % "2.6.1" % Test
 
 val excludeJetty = ExclusionRule(organization = "org.eclipse.jetty.aggregate")
 
-libraryDependencies += "com.mcsherrylabs" %% "sss-ancillary" % "1.18" excludeAll(excludeJetty)
+libraryDependencies += "com.mcsherrylabs" %% "sss-ancillary" % "1.22" excludeAll(excludeJetty)
 
 libraryDependencies += "org.apache.commons" % "commons-dbcp2" % "2.9.0"
 

@@ -3,13 +3,11 @@ package sss.db
 
 import com.typesafe.config.Config
 import sss.ancillary.{DynConfig, Logging, LoggingFutureSupport}
-import sss.db.TxIsolationLevel.TxIsolationLevel
 import sss.db.datasource.DataSource
 import sss.db.datasource.DataSource._
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.DurationInt
-import scala.util.Try
 
 
 
@@ -68,14 +66,13 @@ class Db(dbConfig: DbConfig)(closeableDataSource:CloseableDataSource, ec: Execut
 
   TL;DR for blockchain type applications views are a good solution.
    */
-  def view(name: String): View = new View(name, syncRunContext, dbConfig.freeBlobsEarly)
+  def view(name: String, where: Where = where()): View = new View(name, where, syncRunContext, dbConfig.freeBlobsEarly)
 
   def dropView(viewName: String): FutureTx[Int] = executeSql(s"DROP VIEW ${viewName}")
 
   def createView(createViewSql: String): FutureTx[Int] = executeSql(createViewSql)
 
-  def select(sql: String): Query = new Query(sql, syncRunContext, dbConfig.freeBlobsEarly)
-
+  def select(sql: String, where: Where = where()) = new Query(sql, where, syncRunContext, dbConfig.freeBlobsEarly)
 
   def shutdown: FutureTx[Int] = {
     executeSql("SHUTDOWN") //.map{case x  => Try(closeableDataSource.close()); x}
