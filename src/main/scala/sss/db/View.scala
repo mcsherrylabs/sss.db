@@ -1,6 +1,5 @@
 package sss.db
 
-
 import sss.ancillary.Logging
 
 import scala.language.implicitConversions
@@ -26,29 +25,23 @@ class View private[db] (val name: String,
 
   def maxId(): FutureTx[Long] = max(id)
 
-  def max(colName: String): FutureTx[Long] = { context =>
-    LoggingFuture {
-      val st = context.conn.createStatement() // statement objects can be reused with
+  def max(colName: String): FutureTx[Long] =
+    prepareStatement(s"SELECT MAX($colName) AS max_val FROM $name ${baseWhere.sql}", baseWhere.params) map { ps =>
       try {
-        val rs = st.executeQuery(s"SELECT MAX($colName) AS max_val FROM $name ${baseWhere.sql}")
+        val rs = ps.executeQuery
         if (rs.next) {
           rs.getLong("max_val")
         } else DbError(s"Database did not return max($colName) for table: $name")
-      } finally st.close()
+      } finally ps.close()
+    }
 
-    }(context.ec)
-  }
-
-
-  def count: FutureTx[Long] = { context =>
-    LoggingFuture {
-      val st = context.conn.createStatement() // statement objects can be reused with
+  def count: FutureTx[Long] =
+    prepareStatement(s"SELECT COUNT(*) AS total FROM $name ${baseWhere.sql}", baseWhere.params) map { ps =>
       try {
-        val rs = st.executeQuery(s"SELECT COUNT(*) AS total FROM $name ${baseWhere.sql}")
+        val rs = ps.executeQuery()
         if (rs.next) rs.getLong("total")
         else DbError(s"Database did not return count for table: $name")
-      } finally st.close()
-    }(context.ec)
-  }
+      } finally ps.close()
+    }
 
 }

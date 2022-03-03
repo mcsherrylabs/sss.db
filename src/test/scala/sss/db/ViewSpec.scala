@@ -33,6 +33,12 @@ class ViewSpec extends DbSpecQuickSetup {
     assert(view.maxId().runSyncAndGet == 81)
   }
 
+  "A View with baseWhere with parameters" should "support getting max id and counting" in {
+    val view = db.viewWhere("testview2", where("intVal < ?",  81))
+    assert(view.count.runSyncAndGet == 30)
+    assert(view.maxId().runSyncAndGet == 81)
+  }
+
   "A View of a real table with baseWhere clause" should "support counting" in {
     val view = db.viewWhere("test", where("intVal < 81"))
     assert(view.count.runSyncAndGet == 81)
