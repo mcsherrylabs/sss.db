@@ -17,10 +17,11 @@ import scala.language.implicitConversions
   *
   */
 class View private[db] (val name: String,
+                        baseWhere: Where,
                         runContext: RunContext,
                         freeBlobsEarly: Boolean,
                         columns: String = "*")
-  extends Query(s"SELECT ${columns} from ${name}", where(), runContext, freeBlobsEarly)  with Logging {
+  extends Query(s"SELECT ${columns} from ${name}", baseWhere, runContext, freeBlobsEarly)  with Logging {
 
 
   def maxId(): FutureTx[Long] = max(id)
@@ -29,7 +30,7 @@ class View private[db] (val name: String,
     LoggingFuture {
       val st = context.conn.createStatement() // statement objects can be reused with
       try {
-        val rs = st.executeQuery(s"SELECT MAX($colName) AS max_val FROM ${name}")
+        val rs = st.executeQuery(s"SELECT MAX($colName) AS max_val FROM $name ${baseWhere.sql}")
         if (rs.next) {
           rs.getLong("max_val")
         } else DbError(s"Database did not return max($colName) for table: $name")
@@ -43,7 +44,7 @@ class View private[db] (val name: String,
     LoggingFuture {
       val st = context.conn.createStatement() // statement objects can be reused with
       try {
-        val rs = st.executeQuery(s"SELECT COUNT(*) AS total FROM ${name}")
+        val rs = st.executeQuery(s"SELECT COUNT(*) AS total FROM $name ${baseWhere.sql}")
         if (rs.next) rs.getLong("total")
         else DbError(s"Database did not return count for table: $name")
       } finally st.close()

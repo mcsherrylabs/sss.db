@@ -194,36 +194,6 @@ class DbV2Spec extends DbSpecSetup {
     val page = fixture.table.page(1000, 1).runSyncAndGet
     assert(page.isEmpty)
   }
-  it should "support views" in {
-
-    val db = fixture.dbUnderTest
-    import db.syncRunContext
-
-    try {
-
-      (for {
-        _ <- fixture.dbUnderTest.createView("CREATE VIEW testview2 AS SELECT strId, intVal FROM test WHERE intVal > 50")
-        _ <- persistIntVals(0 to 100)
-      } yield ()).runSyncAndGet
-
-
-      val view = fixture.dbUnderTest.view("testview2")
-      assert(view.count.runSyncAndGet == 50)
-      val empty = view.filter(where("intVal < 50")).runSyncAndGet
-      assert(empty.isEmpty)
-
-    } finally fixture.dbUnderTest.dropView("testview2").runSyncAndGet
-  }
-
-  it should "support select query with non empty base where statement" in {
-    val db = fixture.dbUnderTest
-    import db.syncRunContext
-    val query = db.selectWhere("SELECT * FROM test", where("intVal > 50"))
-    persistIntVals(0 to 100).runSync
-    assert(query.filter().runSyncAndGet.size == 50)
-    assert(query.filter(where("intVal < 50")).runSyncAndGet.isEmpty)
-    assert(query.filter(where("intVal < 76")).runSyncAndGet.size == 25)
-  }
 
   it should " support optimistic locking using the version field " in {
 
@@ -231,10 +201,7 @@ class DbV2Spec extends DbSpecSetup {
 
     import db.syncRunContext
 
-    val time = new Date()
-
     val table = fixture.dbUnderTest.table("testVersion")
-
 
     val (version1, version2) = (for {
       m <- table.persist(Map("version" -> 0, "strId" -> "Hello there world"))

@@ -66,7 +66,9 @@ class Db(dbConfig: DbConfig)(closeableDataSource:CloseableDataSource, ec: Execut
 
   TL;DR for blockchain type applications views are a good solution.
    */
-  def view(name: String): View = new View(name, syncRunContext, dbConfig.freeBlobsEarly)
+  def view(name: String): View = viewWhere(name, where())
+
+  def viewWhere(name: String, where: Where): View = new View(name, where, syncRunContext, dbConfig.freeBlobsEarly)
 
   def dropView(viewName: String): FutureTx[Int] = executeSql(s"DROP VIEW ${viewName}")
 

@@ -97,4 +97,23 @@ class SqlInterpolatorSpec extends AnyFlatSpec with Matchers with BeforeAndAfter 
     assert(w.params == Seq(45))
   }
 
+  import WhereOps.toWhere
+  "and" should "produce correct sql combining empty where with OrderBy" in {
+    val w = where() and OrderAsc("id")
+    assert(w.sql == " ORDER BY id ASC NULLS LAST")
+  }
+
+  "and" should "produce correct sql combining nonempty where with OrderBy" in {
+    val w = where("col1" -> 4) and OrderDesc("col2")
+    assert(w.sql == " WHERE col1 = ? ORDER BY col2 DESC NULLS LAST")
+  }
+
+  "and" should "produce correct sql combining wheres with limits and OrderBy" in {
+    val w = where("col1" -> 4) limit 4 and OrderDesc("col2")
+    assert(w.sql == " WHERE col1 = ? ORDER BY col2 DESC NULLS LAST LIMIT 4")
+    val w2 = where("col2 > 5") limit 7
+    assert((w and w2).sql == " WHERE col1 = ? AND col2 > 5 ORDER BY col2 DESC NULLS LAST LIMIT 7")
+    assert((w2 and w).sql == " WHERE col2 > 5 AND col1 = ? ORDER BY col2 DESC NULLS LAST LIMIT 4")
+    assert((where() and w2).sql == " WHERE col2 > 5 LIMIT 7")
+  }
 }

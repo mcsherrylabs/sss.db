@@ -9,6 +9,7 @@ class Table private[db] (name: String,
 
   extends View(
     name,
+    where(),
     runContext,
     freeBlobsEarly,
     columns) {

@@ -7,8 +7,6 @@ scalaVersion := "2.13.8"
 
 updateOptions := updateOptions.value.withGigahorse(false)
 
-Test / parallelExecution := false
-
 //needed to retrieve ancillary, publish happens via global.sbt.
 resolvers += "stepsoft" at "https://nexus.mcsherrylabs.com/repository/releases/"
 
