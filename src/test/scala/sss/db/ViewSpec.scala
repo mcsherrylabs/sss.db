@@ -2,6 +2,9 @@ package sss.db
 
 import org.scalatest.DoNotDiscover
 
+import java.util.Date
+import scala.concurrent.ExecutionException
+
 @DoNotDiscover
 class ViewSpec extends DbSpecQuickSetup {
 
@@ -34,7 +37,7 @@ class ViewSpec extends DbSpecQuickSetup {
   }
 
   "A View with baseWhere with parameters" should "support getting max id and counting" in {
-    val view = db.view("testview2", where("intVal < ?",  81))
+    val view = db.view("testview2", where("intVal < ?", 81))
     assert(view.count.runSyncAndGet == 30)
     assert(view.maxId().runSyncAndGet == 81)
   }
@@ -48,5 +51,51 @@ class ViewSpec extends DbSpecQuickSetup {
   it should "support getting max id" in {
     val view = db.view("test", where("intVal < 81"))
     assert(view.maxId().runSyncAndGet == 81)
+  }
+
+  "An UpdatableView " should "support updating" in {
+    val view = db.updatableView("test", where("intVal < 81"))
+    assert(
+      view
+        .update(Map("strId" -> "strId", "createTime" -> new Date(), "intVal" -> -30), where("intVal=50"))
+        .runSyncAndGet == 1
+    )
+    assert(view.updateRow(Map("id" -> 52, "strId" -> "strId", "createTime" -> new Date(), "intVal" -> -31)).runSyncAndGet.int("intVal") == -31)
+    assert(view(51).runSyncAndGet.int("intVal") == -30)
+    assert(view(52).runSyncAndGet.int("intVal") == -31)
+  }
+
+  it should "disallow updating rows outside the view" in {
+    val view = db.updatableView("test", where("intVal < 81"))
+    assert(
+      view
+        .update(Map("strId" -> "strId", "createTime" -> new Date(), "intVal" -> -30), where("intVal=83"))
+        .runSyncAndGet == 0
+    )
+    assert(
+      intercept[DbException](
+        view.updateRow(Map("id" -> 82, "strId" -> "strId", "createTime" -> new Date(), "intVal" -> -30)).runSyncAndGet
+      ).getMessage.contains("82")
+    )
+    assert(view.getRow(84).runSyncAndGet.isEmpty)
+  }
+
+  "An InsertableView" should "support inserting new rows" in {
+    val view = db.insertableView("test", where("intVal < 102"))
+    assert(view.count.runSyncAndGet == 101)
+    view.insert(Map("strId" -> "strId", "intVal" -> -30)).runSyncAndGet
+    assert(view.count.runSyncAndGet == 102)
+    assert(view.insert(108, "strId", new Date(), 107).runSyncAndGet == 1)
+    assert(view.count.runSyncAndGet == 102)
+    val fullView = db.insertableView("test")
+    assert(fullView.count.runSyncAndGet == 103)
+  }
+
+  it should "disallow inserting rows which will end up outside the view" in {
+    val view = db.insertableView("test", where("intVal < 102"))
+    val fullView = db.insertableView("test")
+    intercept[ExecutionException](view.insert(Map("strId" -> "strId", "intVal" -> 103)).runSyncAndGet)
+    assert(view.count.runSyncAndGet == 101)
+    assert(fullView.count.runSyncAndGet == 101)
   }
 }
