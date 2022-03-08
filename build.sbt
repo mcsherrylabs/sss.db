@@ -1,7 +1,7 @@
 
 name := "sss-db"
 
-version := "0.9.53"
+version := "0.9.54"
 
 scalaVersion := "2.13.8"
 
@@ -49,6 +49,8 @@ libraryDependencies += "org.apache.commons" % "commons-dbcp2" % "2.9.0"
 
 libraryDependencies += "org.apache.commons" % "commons-pool2" % "2.11.1"
 
-libraryDependencies += "com.zaxxer" % "HikariCP" % "5.0.1"
+val excludeSlf4j = ExclusionRule(organization = "org.slf4j")
+
+libraryDependencies += "com.zaxxer" % "HikariCP" % "5.0.1" excludeAll(excludeSlf4j)
 
 
