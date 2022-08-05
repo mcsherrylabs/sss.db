@@ -1,7 +1,7 @@
 
 name := "sss-db"
 
-version := "0.9.54"
+version := "0.9.55"
 
 scalaVersion := "2.13.8"
 
@@ -33,8 +33,6 @@ credentials += sys.env.get("NEXUS_USER").map(userName => Credentials(
 
 
 dependencyOverrides += "org.scala-lang" % "scala-compiler" % scalaVersion.value
-
-//libraryDependencies += "joda-time" % "joda-time" % "2.9.9"
 
 // https://mvnrepository.com/artifact/org.scalatest/scalatest
 libraryDependencies += "org.scalatest" %% "scalatest" % "3.2.2" % Test

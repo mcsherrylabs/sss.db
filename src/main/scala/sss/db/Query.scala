@@ -1,22 +1,12 @@
 package sss.db
 
+import sss.ancillary.{Logging, LoggingFutureSupport}
+
 import java.io.InputStream
 import java.sql.PreparedStatement
 import java.util.Date
-import org.joda.time.LocalDate
-import sss.ancillary.{Logging, LoggingFutureSupport}
-
 import scala.collection.WithFilter
-import scala.concurrent.Future
-
-//import scala.collection.generic.FilterMonadic
-import scala.collection.mutable
 import scala.language.implicitConversions
-import scala.reflect.runtime.universe._
-import scala.collection.{mutable, WithFilter}
-//import scala.collection.IndexedSeq
-
-//import scala.language.implicitConversions
 
 
 /**
@@ -62,7 +52,6 @@ class Query private[db] (private val selectSql: String,
     value match {
       case v: String => v //s"'${v}'"
       case v: Date => v.getTime
-      case v: LocalDate => v.toDate.getTime
       case null => null
       case Some(x) => mapToSql(x)
       case None => null
