@@ -39,7 +39,7 @@ libraryDependencies += "org.hsqldb" % "hsqldb" % "2.6.1" % Test
 
 val excludeJetty = ExclusionRule(organization = "org.eclipse.jetty.aggregate")
 
-libraryDependencies += "com.mcsherrylabs" %% "sss-ancillary" % "1.25" excludeAll(excludeJetty)
+libraryDependencies += "com.mcsherrylabs" %% "sss-ancillary" % "1.26" excludeAll(excludeJetty)
 
 libraryDependencies += "org.apache.commons" % "commons-dbcp2" % "2.9.0"
 
