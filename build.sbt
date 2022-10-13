@@ -1,9 +1,9 @@
 
 name := "sss-db"
 
-version := "0.9.56"
+version := "0.9.57"
 
-scalaVersion := "2.13.9"
+scalaVersion := "2.13.10"
 
 publishMavenStyle := true
 
