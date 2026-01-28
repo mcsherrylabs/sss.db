@@ -14,20 +14,14 @@ sss.db is a Scala library for basic SQL database access with a focus on simplici
 ## Build Commands
 
 ```bash
-# Compile the project
-sbt compile
+# Compile and test
+sbt clean test
 
-# Run tests
-sbt test
-
-# Run a specific test
+# Run specific test
 sbt "testOnly sss.db.DbSpec"
 
-# Package for publishing
-sbt clean test publishSigned
-
-# Build without publishing
-sbt package
+# Publish to Maven Central (requires credentials)
+sbt publishSigned
 ```
 
 ## Architecture
@@ -377,34 +371,9 @@ table.toPaged(pageSize = 1000).toIterator.grouped(1000).foreach { batch =>
 
 ## Testing
 
-Tests use ScalaTest with trait-based setup:
-- `DbSpecSetup`: Standard FlatSpec setup with beforeEach/afterEach
-- `DbSpecQuickSetup`: Exposes db/table/syncRunContext as instance variables
-- `AsyncDbSpecSetup`: For AsyncFlatSpec tests
-
-Tests create a `Db` instance from config name "testDb" which uses HSQLDB in-memory database. The `afterEach` hook calls `db.shutdown.runSyncAndGet` to clean up.
-
-## Scala Version and Dependencies
-
-- **Scala**: 2.13.10
-- **Java**: 11 (source and target)
-- **Key dependencies**:
-  - sss-ancillary (logging, config)
-  - HikariCP (connection pooling)
-  - Apache DBCP2/Pool2 (alternative pooling)
-  - ScalaTest (testing)
-
-## Publishing
-
-Published to Maven Central via Sonatype. Publishing requires:
-- PGP key configured (see build.sbt line 52)
-- SONA_USER and SONA_PASS environment variables
-- Tag push triggers GitHub Actions CI/CD workflow
+Tests use ScalaTest. See test setup traits in `src/test/scala/sss/db/DbSpecSetup.scala` (DbSpecSetup, DbSpecQuickSetup, AsyncDbSpecSetup) and test examples in `src/test/scala/sss/db/DbSpec.scala`.
 
 ## Code Style Notes
 
-- Uses implicit RunContext for execution (passed to Tables/Views/Queries)
-- Extensive use of type aliases (Rows, QueryResults, ColumnTypes)
-- Pattern: try/finally for resource cleanup (not Try monad)
+- Uses implicit RunContext for execution (must be in scope for Tables/Views/Queries)
 - Column names are case-insensitive (converted to lowercase)
-- Row accessors have both `.opt` and non-opt versions (throwing on None)
