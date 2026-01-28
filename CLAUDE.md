@@ -1,5 +1,11 @@
 # CLAUDE.md
 
+> **Note for human readers:** This file is optimized for AI assistance with Claude Code.
+> For human-readable documentation, please see:
+> - [Getting Started Guide](docs/getting-started.md) - 30-minute tutorial
+> - [Documentation Hub](docs/README.md) - Complete documentation index
+> - [API Reference](docs/api/scaladoc/index.html) - ScalaDoc reference
+
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
