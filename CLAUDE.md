@@ -79,6 +79,127 @@ val blobData = (for {
 
 **Optimistic Locking**: Automatic if table definition includes a 'version' column. Updates increment version and fail if version changed.
 
+### Error Handling
+
+Database operations return `Try[T]` (sync) or `Future[T]` (async). Transactions automatically rollback on exception and close connections.
+
+**Exception Types:**
+- `DbException`: Recoverable errors (constraint violations, deadlocks, timeouts)
+- `DbOptimisticLockingException`: Version conflict during update (subclass of DbException)
+- `DbError`: Unrecoverable errors (configuration issues, schema problems)
+
+**Synchronous Error Handling:**
+```scala
+table.persist(values).runSync match {
+  case Success(row) =>
+    println(s"Created row ${row.id}")
+  case Failure(e: DbOptimisticLockingException) =>
+    // Retry with fresh version
+    retryOperation()
+  case Failure(e: DbException) =>
+    logger.error(s"Database error: ${e.getMessage}")
+  case Failure(e) =>
+    throw e
+}
+```
+
+**Asynchronous Error Handling:**
+```scala
+table.persist(values).run.map { row =>
+  println(s"Created row ${row.id}")
+}.recover {
+  case e: DbOptimisticLockingException => // Retry logic
+  case e: DbException => // Handle error
+}
+```
+
+**Retry Pattern for Optimistic Locking:**
+```scala
+def persistWithRetry[T](op: FutureTx[T], maxRetries: Int = 3): Try[T] = {
+  (1 to maxRetries).iterator.map { attempt =>
+    op.runSync match {
+      case s @ Success(_) => return s
+      case Failure(e: DbOptimisticLockingException) if attempt < maxRetries =>
+        Thread.sleep(100 * attempt) // Exponential backoff
+      case f @ Failure(_) => return f
+    }
+  }.toSeq
+  Failure(new Exception("Max retries exceeded"))
+}
+```
+
+### Transaction Semantics
+
+**FutureTx operations are:**
+- **Lazy**: No execution until `.run` or `.runSync` called
+- **Atomic**: Either all operations commit or all rollback
+- **Isolated**: Configurable isolation levels (default: READ_COMMITTED)
+- **Composable**: Use for-comprehensions to combine operations
+
+**Connection lifecycle:**
+1. Acquired from pool when transaction starts
+2. Auto-commit disabled
+3. Operations executed within transaction
+4. Commit on success (or rollback on exception)
+5. Connection returned to pool (guaranteed via try/finally)
+
+**Transaction isolation levels:**
+```scala
+import sss.db.TxIsolationLevel._
+
+// Configure per-database
+Db(config, dataSource, executionContext, SERIALIZABLE)
+```
+
+Available levels: READ_UNCOMMITTED, READ_COMMITTED, REPEATABLE_READ, SERIALIZABLE
+
+**Transaction timeout:** Default is 3 seconds for SyncRunContext. Override for long operations:
+```scala
+implicit val customSync = new SyncRunContext(ec, timeout = 30.seconds)
+```
+
+### Concurrency and Thread Safety
+
+**Thread-safe components:**
+- `Table`/`View` instances - safe to share across threads
+- `Row` instances - immutable, safe to pass between threads
+- Connection pool - thread-safe
+
+**Execution context selection:**
+
+**SyncRunContext (blocking):**
+- Blocks calling thread until operation completes
+- Simpler mental model for sequential operations
+- Use for: CLIs, simple scripts, test code
+- Thread pool sizing: 1 thread per concurrent transaction
+- Default timeout: 3 seconds
+
+**AsyncRunContext (non-blocking):**
+- Returns Future[T], doesn't block caller
+- More efficient thread utilization
+- Use for: Web services, high-concurrency apps
+- Smaller connection pool acceptable (futures queue)
+- Requires understanding of Future composition
+
+**Rule of thumb:** If you need the result immediately and concurrency is low (<10 req/sec), use sync. For high throughput, use async.
+
+### Resource Management
+
+**Connection management:**
+```scala
+// Connections acquired on transaction start
+// Automatically released on completion/error
+val result = table.persist(data).runSync // Connection closed after this
+```
+
+**Cleanup guarantees:**
+- PreparedStatements closed via try/finally
+- ResultSets closed after Row extraction
+- Connections returned to pool even on exception
+- Blobs freed early when `freeBlobsEarly = true`
+
+**Pattern:** Library uses try/finally for resource cleanup (not Try monad) to ensure exceptions propagate while guaranteeing cleanup.
+
 ### Security Considerations
 
 **SQL Injection Prevention**: This library uses prepared statements for **values**, which prevents SQL injection. However, table names, column names, and SQL keywords **cannot be parameterized**.
@@ -153,6 +274,106 @@ testDb {
   createSql = ["CREATE TABLE IF NOT EXISTS my_table (...)"]
 }
 ```
+
+### Configuration Reference
+
+**Core Settings:**
+
+- **viewCachesSize** (default: 100): Cache size for View metadata. Caches column metadata per View to avoid repeated DB calls. Increase for apps with many distinct views (>100 unique queries). Each cache entry is small (~1KB), safe to increase to 1000+.
+
+- **useShutdownHook** (default: true): Register JVM shutdown hook to close connections. Set false if managing lifecycle manually or using container shutdown hooks.
+
+- **freeBlobsEarly** (default: false): Release blob memory immediately after extraction. Set true to free memory sooner at cost of small performance overhead. Recommended for large blobs or high memory pressure.
+
+- **deleteSql** / **createSql**: Optional SQL statements to run on database startup. Useful for setup/teardown in tests or creating tables on first run.
+
+**Connection Pool Tuning (HikariCP):**
+
+```
+datasource {
+  # Pool sizing
+  maxPoolSize = 10                    # Max concurrent connections
+  minimumIdle = 2                     # Min idle connections maintained
+
+  # Timeouts (milliseconds)
+  connectionTimeout = 30000           # Max wait for connection (30s)
+  idleTimeout = 600000                # Idle connection lifetime (10m)
+  maxLifetime = 1800000               # Max connection lifetime (30m)
+
+  # Prepared statement caching
+  cachePrepStmts = true               # Enable caching
+  prepStmtCacheSize = 250             # Cache up to 250 statements
+  prepStmtCacheSqlLimit = 2048        # Cache statements up to 2KB
+
+  # Performance tuning
+  useServerPrepStmts = true           # Use server-side prep statements
+}
+```
+
+**Connection pool sizing guidelines:**
+- Sync contexts: pool size ≈ max concurrent blocking threads
+- Async contexts: smaller pool OK (futures queue efficiently)
+- Formula: max_concurrent_transactions + 2-5 buffer
+- Monitor: connection wait times, active connections
+
+## Performance Best Practices
+
+### N+1 Query Prevention
+
+Never call database operations inside a loop over query results. This creates N+1 queries, causing severe performance degradation.
+
+**Anti-pattern (N+1 queries):**
+```scala
+// Fetches each related row individually
+val users = userTable.findAll().runSyncAndGet
+users.map { user =>
+  val orders = orderTable.find(where(ps"user_id = ${user.id}")).runSyncAndGet
+  (user, orders) // Creates 1 + N queries
+}
+```
+
+**Good pattern (2 queries):**
+```scala
+val users = userTable.findAll().runSyncAndGet
+val userIds = users.map(_.id)
+val orders = orderTable.filter(where(ps"user_id").in(userIds)).runSyncAndGet
+val ordersByUser = orders.groupBy(_.long("user_id"))
+users.map(user => (user, ordersByUser.getOrElse(user.id, Seq.empty)))
+```
+
+### Batch Operations
+
+Use `FutureTx.sequence` to batch independent operations in a single transaction:
+
+**Anti-pattern (N transactions):**
+```scala
+data.foreach { item =>
+  table.insert(item).runSyncAndGet // Separate transaction per insert
+}
+```
+
+**Good pattern (1 transaction):**
+```scala
+val inserts = data.map(table.insert)
+val batchOp = FutureTx.sequence(inserts)
+batchOp.runSyncAndGet // Single transaction for all inserts
+```
+
+### Large Result Sets
+
+Use PagedView for queries returning >10,000 rows:
+```scala
+table.toPaged(pageSize = 1000).toIterator.grouped(1000).foreach { batch =>
+  processBatch(batch) // Only 1000 rows in memory at a time
+}
+```
+
+### Query Optimization
+
+- Always use WHERE clauses with indexed columns
+- Avoid SELECT * on tables with many columns or blobs
+- Use specific column lists: `new View("table", where(), runContext, freeBlobsEarly, "id,name")`
+- Leverage prepared statement caching (enabled by default with HikariCP)
 
 ## Testing
 
