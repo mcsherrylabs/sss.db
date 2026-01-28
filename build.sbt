@@ -53,6 +53,19 @@ usePgpKeyHex("F4ED23D42A612E27F11A6B5AF75482A04B0D9486")
 
 javacOptions := Seq("-source", "11", "-target", "11")
 
+// ScalaDoc configuration
+Compile / doc / scalacOptions ++= Seq(
+  "-groups",                           // Group related APIs
+  "-implicits",                        // Document implicit conversions
+  "-diagrams",                         // Generate inheritance diagrams
+  "-doc-title", "sss.db",
+  "-doc-version", version.value,
+  "-doc-root-content", "docs/scaladoc-root.txt"
+)
+
+// Output directory for ScalaDoc
+Compile / doc / target := file("docs/api/scaladoc")
+
 pomExtra := (
   <url>https://github.com/mcsherrylabs/sss.db</url>
     <licenses>

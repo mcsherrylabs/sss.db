@@ -1,0 +1,51 @@
+This is the API documentation for '''sss.db''', a Scala library for simple, type-safe SQL database access.
+
+== Overview ==
+
+sss.db provides a straightforward approach to database access in Scala with a focus on:
+
+ - '''Transaction safety''': Automatic transaction management with the FutureTx monad
+ - '''Type safety''': Type-safe row accessors and query DSL
+ - '''Simplicity''': Natural DSL without complex type-level programming
+ - '''Production ready''': Built-in optimistic locking, connection pooling (HikariCP), and error handling
+
+== Getting Started ==
+
+For tutorials, guides, and examples, see the [[https://github.com/mcsherrylabs/sss.db/tree/master/docs main documentation]].
+
+== Key Abstractions ==
+
+ - [[sss.db.FutureTx FutureTx[T]]]: The central monad representing database operations within a transaction
+ - [[sss.db.Db Db]]: Entry point for creating Tables and Views
+ - [[sss.db.Table Table]]: Full read/write access to a database table
+ - [[sss.db.View View]]: Read-only database view
+ - [[sss.db.Row Row]]: Type-safe access to query result rows
+ - [[sss.db.Where Where]]: DSL for building WHERE clauses with prepared statements
+
+== Example ==
+
+{{{
+import sss.db._
+import scala.concurrent.ExecutionContext.Implicits.global
+
+implicit val sync = new SyncRunContext(global)
+val db = Db("database")
+val userTable = db.table("users")
+
+// Compose operations in a transaction
+val result = (for {
+  user <- userTable.persist(Map("name" -> "Alice", "email" -> "alice@example.com"))
+  _ <- userTable.update(Map("active" -> true), where(ps"id = ${user.id}"))
+} yield user).runSync
+
+result match {
+  case Success(user) => println(s"Created user: ${user.id}")
+  case Failure(e) => println(s"Error: ${e.getMessage}")
+}
+}}}
+
+== Documentation ==
+
+ - [[https://github.com/mcsherrylabs/sss.db/blob/master/docs/getting-started.md Getting Started Guide]]
+ - [[https://github.com/mcsherrylabs/sss.db/blob/master/docs/core-concepts.md Core Concepts]]
+ - [[https://github.com/mcsherrylabs/sss.db/blob/master/docs/README.md Full Documentation]]
