@@ -71,20 +71,71 @@ where(ps"column = $value AND other = $otherValue")
 
 **Blob Handling**: When working with byte arrays/blobs, extraction must happen INSIDE the transaction:
 ```scala
-table.tx {
-  val found = table.find(where(ps"blobVal = $bytes"))
-  val bytes = found.get.blobByteArray("blobVal") // MUST be inside tx
-}
+val blobData = (for {
+  found <- table.find(where(ps"blobVal = $bytes"))
+  data = found.get.blobByteArray("blobVal") // Extract inside FutureTx
+} yield data).runSyncAndGet
 ```
 
 **Optimistic Locking**: Automatic if table definition includes a 'version' column. Updates increment version and fail if version changed.
 
+### Security Considerations
+
+**SQL Injection Prevention**: This library uses prepared statements for **values**, which prevents SQL injection. However, table names, column names, and SQL keywords **cannot be parameterized**.
+
+**Safe (parameterized values):**
+```scala
+where(ps"email = $userInput AND status = $statusInput")  // ✓ SAFE
+```
+
+**Unsafe (dynamic identifiers):**
+```scala
+where(s"$userColumn = ?", value)  // ✗ VULNERABLE if userColumn is untrusted
+```
+
+**For dynamic column names, use validation:**
+```scala
+val allowedColumns = Set("id", "email", "status", "created_at")
+require(allowedColumns.contains(columnName), s"Invalid column: $columnName")
+where(s"$columnName = ?", value) // Now safe
+```
+
+**Dangerous Operations**: The `executeSql` method bypasses prepared statements and should be used with extreme caution. Only use for trusted SQL (migrations, admin operations), never with user input.
+
 ## Configuration
 
-Database configuration goes in `application.conf` (or test resources):
+⚠️ **SECURITY WARNING:** Never commit database credentials to version control. Use environment variables for production credentials.
+
+### Production Configuration
+
+Use environment variables to avoid hardcoding credentials:
 
 ```
 database {
+  datasource {
+    driver = "org.postgresql.Driver"
+    connection = ${DATABASE_URL}      # From environment variable
+    user = ${DATABASE_USER}           # From environment variable
+    pass = ${DATABASE_PASSWORD}       # From environment variable
+    maxPoolSize = 10
+  }
+
+  viewCachesSize = 100
+  useShutdownHook = false
+  freeBlobsEarly = false
+}
+```
+
+**Environment variable syntax:**
+- `${VAR_NAME}` - Required, fails if not set
+- `${?VAR_NAME}` - Optional, empty if not set
+
+### Test Configuration
+
+For tests only, inline credentials are acceptable:
+
+```
+testDb {
   datasource {
     driver = "org.hsqldb.jdbc.JDBCDriver"
     connection = "jdbc:hsqldb:mem:test"
