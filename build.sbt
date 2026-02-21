@@ -1,9 +1,9 @@
 
 name := "sss-db"
 
-version := "0.9.57"
+version := "0.9.58"
 
-scalaVersion := "2.13.10"
+scalaVersion := "2.13.16"
 
 publishMavenStyle := true
 
@@ -13,24 +13,22 @@ updateOptions := updateOptions.value.withGigahorse(false)
 
 organization := "com.mcsherrylabs"
 
-publishTo := Some {
-  val sonaUrl = "https://oss.sonatype.org/"
-  if (isSnapshot.value)
-    "snapshots" at sonaUrl + "content/repositories/snapshots"
-  else
-    "releases" at sonaUrl + "service/local/staging/deploy/maven2"
-}
+// Sonatype Central Portal (replaced legacy OSSRH in Feb 2024)
+sonatypeCredentialHost := "central.sonatype.com"
 
-credentials += sys.env.get("SONA_USER").map(userName => Credentials(
-  "Sonatype Nexus Repository Manager",
-  "oss.sonatype.org",
-  userName,
-  sys.env.getOrElse("SONA_PASS", ""))
-).getOrElse(
-  Credentials(Path.userHome / ".ivy2" / ".credentials")
-)
+publishTo := sonatypePublishToBundle.value
+
+credentials ++= Seq(
+  Credentials(Path.userHome / ".sbt" / "sonatype_credentials")
+) ++ sys.env.get("SONATYPE_USERNAME").map(u =>
+  Credentials("Sonatype Nexus Repository Manager", "central.sonatype.com", u,
+    sys.env.getOrElse("SONATYPE_PASSWORD", ""))
+).toSeq
 
 dependencyOverrides += "org.scala-lang" % "scala-compiler" % scalaVersion.value
+
+// Tests intentionally exercise the deprecated row[T](col) API — suppress the warnings
+Test / scalacOptions += "-Wconf:cat=deprecation:s"
 
 // https://mvnrepository.com/artifact/org.scalatest/scalatest
 libraryDependencies += "org.scalatest" %% "scalatest" % "3.2.2" % Test
@@ -49,9 +47,9 @@ val excludeSlf4j = ExclusionRule(organization = "org.slf4j")
 
 libraryDependencies += "com.zaxxer" % "HikariCP" % "5.0.1" excludeAll(excludeSlf4j)
 
-usePgpKeyHex("F4ED23D42A612E27F11A6B5AF75482A04B0D9486")
+usePgpKeyHex("323F3F6EBDB010C1265C69F040DD84EA50085F5D")
 
-javacOptions := Seq("-source", "11", "-target", "11")
+javacOptions := Seq("--release", "11")
 
 // ScalaDoc configuration
 Compile / doc / scalacOptions ++= Seq(

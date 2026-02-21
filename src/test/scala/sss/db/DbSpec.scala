@@ -14,7 +14,9 @@ class DbSpec extends
       new ParallelThreadSupportSpec,
       new ValidateTransactionSpec,
       new SetIsolationLevelSupportSpec,
-      new RowSerializeSpec
+      new RowSerializeSpec,
+      new ViewSpec,
+      new QuerySpec
   ) with
   BeforeAndAfterAll with
   SequentialNestedSuiteExecution {
