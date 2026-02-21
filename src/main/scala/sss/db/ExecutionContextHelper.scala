@@ -7,7 +7,7 @@ import scala.concurrent.ExecutionContext
 
 object ExecutionContextHelper {
 
-  implicit val ioExecutionContext = createThreadPoolExecutionContext()
+  implicit val ioExecutionContext: ExecutionContext = createThreadPoolExecutionContext()
 
   implicit val synchronousExecutionContext: ExecutionContext = ExecutionContext.fromExecutor(task => task.run())
 

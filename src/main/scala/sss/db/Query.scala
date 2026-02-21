@@ -63,7 +63,7 @@ class Query private[db] (private val selectSql: String,
       case v: Byte => Array(v)
       case v: Array[Byte] => v
       //case v: mutable.WrappedArray[_] => v.array
-      case v: collection.IndexedSeq[Byte] => Array.from(v)
+      case v: collection.IndexedSeq[_] => Array.from(v.asInstanceOf[collection.IndexedSeq[Byte]])
       case v: scala.math.BigDecimal => v.bigDecimal
       case v: scala.math.BigInt => v.bigInteger
       case v: Float => v
