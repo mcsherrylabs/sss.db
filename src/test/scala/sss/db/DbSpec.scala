@@ -17,7 +17,8 @@ class DbSpec extends
       new RowSerializeSpec,
       new ViewSpec,
       new QuerySpec,
-      new DbOpsSpec
+      new DbOpsSpec,
+      new DbInitialSqlExecutorSpec
   ) with
   BeforeAndAfterAll with
   SequentialNestedSuiteExecution {
